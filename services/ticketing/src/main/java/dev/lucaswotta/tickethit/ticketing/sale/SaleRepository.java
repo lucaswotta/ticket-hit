@@ -1,5 +1,6 @@
 package dev.lucaswotta.tickethit.ticketing.sale;
 
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
@@ -24,6 +25,17 @@ public class SaleRepository {
                 .param("strategy", strategy.name())
                 .query(UUID.class)
                 .single();
+    }
+
+    public Optional<Sale> find(UUID saleId) {
+        return jdbc.sql("""
+                        select id, name, total_tickets, available_tickets, inventory_strategy
+                          from sale
+                         where id = :saleId
+                        """)
+                .param("saleId", saleId)
+                .query(Sale.class)
+                .optional();
     }
 
     public int availableTickets(UUID saleId) {
