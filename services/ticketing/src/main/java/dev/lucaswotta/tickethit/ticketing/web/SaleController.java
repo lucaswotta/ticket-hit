@@ -20,6 +20,9 @@ import org.springframework.web.util.UriComponentsBuilder;
 @RestController
 class SaleController {
 
+    // Posto pelo gateway a partir do token; o valor enviado pelo cliente é descartado lá.
+    private static final String CUSTOMER_ID = "X-Customer-Id";
+
     private final SaleRepository sales;
     private final HoldService holdService;
     private final PassVerifier passVerifier;
@@ -47,22 +50,23 @@ class SaleController {
     @PostMapping("/api/sales/{saleId}/holds")
     ResponseEntity<Hold> hold(
             @PathVariable UUID saleId,
+            @RequestHeader(CUSTOMER_ID) String customerId,
             @RequestHeader("Queue-Pass") String pass,
             @Valid @RequestBody HoldRequest request,
             UriComponentsBuilder uri) {
-        UUID passId = passVerifier.verify(pass, saleId, request.customerId());
-        Hold hold = holdService.hold(saleId, request.customerId(), request.quantity(), passId);
+        UUID passId = passVerifier.verify(pass, saleId, customerId);
+        Hold hold = holdService.hold(saleId, customerId, request.quantity(), passId);
         return ResponseEntity.created(uri.path("/api/holds/{id}").build(hold.id())).body(hold);
     }
 
     // 202: o pagamento foi aceito e a confirmação chega depois, pelo Kafka.
     @PostMapping("/api/holds/{holdId}/payment")
-    ResponseEntity<Hold> pay(@PathVariable UUID holdId) {
-        return ResponseEntity.accepted().body(holdService.pay(holdId));
+    ResponseEntity<Hold> pay(@PathVariable UUID holdId, @RequestHeader(CUSTOMER_ID) String customerId) {
+        return ResponseEntity.accepted().body(holdService.pay(holdId, customerId));
     }
 
     @GetMapping("/api/holds/{holdId}")
-    Hold findHold(@PathVariable UUID holdId) {
-        return holdService.find(holdId);
+    Hold findHold(@PathVariable UUID holdId, @RequestHeader(CUSTOMER_ID) String customerId) {
+        return holdService.findOwned(holdId, customerId);
     }
 }

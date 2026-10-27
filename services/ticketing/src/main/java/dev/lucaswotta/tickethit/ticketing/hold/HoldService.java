@@ -72,12 +72,23 @@ public class HoldService {
         return holds.find(holdId).orElseThrow(() -> new HoldNotFoundException(holdId));
     }
 
+    // O hold de outro comprador responde como inexistente: um 403 confirmaria
+    // que aquele id existe.
+    public Hold findOwned(UUID holdId, String customerId) {
+        Hold hold = find(holdId);
+        if (!hold.customerId().equals(customerId)) {
+            throw new HoldNotFoundException(holdId);
+        }
+        return hold;
+    }
+
     /**
      * Sem transação de propósito: segurar uma conexão do banco aberta durante
      * uma chamada HTTP com retry esgotaria o pool sob carga. Cada passo grava
      * sozinho, e a falha desfaz o PAYING explicitamente.
      */
-    public Hold pay(UUID holdId) {
+    public Hold pay(UUID holdId, String customerId) {
+        findOwned(holdId, customerId);
         Hold paying = holds.startPayment(holdId, clock.instant())
                 .orElseThrow(() -> new HoldNotPayableException(holdId, find(holdId).status()));
         try {

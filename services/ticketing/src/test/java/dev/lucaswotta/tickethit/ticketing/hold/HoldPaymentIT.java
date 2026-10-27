@@ -54,7 +54,7 @@ class HoldPaymentIT {
     void payMovesHoldToPayingAndChargesWithTheHold() {
         Hold hold = holdService.hold(sales.open("Noite 1", 10, InventoryStrategy.ATOMIC), "ana", 2, UUID.randomUUID());
 
-        Hold paying = holdService.pay(hold.id());
+        Hold paying = holdService.pay(hold.id(), "ana");
 
         assertThat(paying.status()).isEqualTo(HoldStatus.PAYING);
         assertThat(paying.paymentRequestedAt()).isNotNull();
@@ -66,7 +66,16 @@ class HoldPaymentIT {
         Hold hold = holdService.hold(sales.open("Noite 1", 10, InventoryStrategy.ATOMIC), "ana", 2, UUID.randomUUID());
         doThrow(mock(PaymentUnavailableException.class)).when(paymentClient).charge(eq(hold.id()), any());
 
-        assertThatThrownBy(() -> holdService.pay(hold.id())).isInstanceOf(PaymentUnavailableException.class);
+        assertThatThrownBy(() -> holdService.pay(hold.id(), "ana")).isInstanceOf(PaymentUnavailableException.class);
+
+        assertThat(holdService.find(hold.id()).status()).isEqualTo(HoldStatus.HELD);
+    }
+
+    @Test
+    void anotherBuyerCannotPayTheHold() {
+        Hold hold = holdService.hold(sales.open("Noite 1", 10, InventoryStrategy.ATOMIC), "ana", 2, UUID.randomUUID());
+
+        assertThatThrownBy(() -> holdService.pay(hold.id(), "bot-1")).isInstanceOf(HoldNotFoundException.class);
 
         assertThat(holdService.find(hold.id()).status()).isEqualTo(HoldStatus.HELD);
     }
@@ -76,14 +85,14 @@ class HoldPaymentIT {
         Hold hold = holdService.hold(sales.open("Noite 1", 10, InventoryStrategy.ATOMIC), "ana", 2, UUID.randomUUID());
         clock.advance(Duration.ofMinutes(10));
 
-        assertThatThrownBy(() -> holdService.pay(hold.id())).isInstanceOf(HoldNotPayableException.class);
+        assertThatThrownBy(() -> holdService.pay(hold.id(), "ana")).isInstanceOf(HoldNotPayableException.class);
     }
 
     @Test
     void payingHoldIsNotExpired() {
         UUID saleId = sales.open("Noite 1", 10, InventoryStrategy.ATOMIC);
         Hold hold = holdService.hold(saleId, "ana", 2, UUID.randomUUID());
-        holdService.pay(hold.id());
+        holdService.pay(hold.id(), "ana");
         clock.advance(Duration.ofMinutes(10));
 
         expireAllDue();

@@ -39,7 +39,16 @@ class SaleApiIT {
         assertThat(held).bodyJson().extractingPath("$.status").isEqualTo("HELD");
         String holdId = JsonPath.read(held.getResponse().getContentAsString(), "$.id");
 
-        assertThat(mvc.get().uri("/api/holds/" + holdId)).hasStatusOk();
+        assertThat(mvc.get().uri("/api/holds/" + holdId).header("X-Customer-Id", "ana")).hasStatusOk();
+        assertThat(mvc.get().uri("/api/holds/" + holdId).header("X-Customer-Id", "bot-1"))
+                .hasStatus(HttpStatus.NOT_FOUND);
+        assertThat(mvc.post().uri("/api/holds/" + holdId + "/payment").header("X-Customer-Id", "bot-1"))
+                .hasStatus(HttpStatus.NOT_FOUND);
+        assertThat(mvc.post().uri("/api/holds/" + holdId + "/payment").header("X-Customer-Id", "ana"))
+                .hasStatus(HttpStatus.ACCEPTED)
+                .bodyJson()
+                .extractingPath("$.status")
+                .isEqualTo("PAYING");
         assertThat(mvc.get().uri("/api/sales/" + saleId))
                 .bodyJson()
                 .extractingPath("$.availableTickets")
@@ -73,11 +82,10 @@ class SaleApiIT {
 
         MvcTestResult result = mvc.post()
                 .uri("/api/sales/" + saleId + "/holds")
+                .header("X-Customer-Id", "ana")
                 .header("Queue-Pass", passFor(saleId, "ana"))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                        {"quantity": 1}
-                        """)
+                .content("{}")
                 .exchange();
 
         assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
@@ -88,9 +96,14 @@ class SaleApiIT {
     void holdWithoutPassIsBadRequest() throws Exception {
         String saleId = openSale(10);
 
-        assertThat(post("/api/sales/" + saleId + "/holds", """
-                        {"customerId": "ana", "quantity": 1}
-                        """))
+        assertThat(mvc.post()
+                        .uri("/api/sales/" + saleId + "/holds")
+                        .header("X-Customer-Id", "ana")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"quantity": 1}
+                                """)
+                        .exchange())
                 .hasStatus(HttpStatus.BAD_REQUEST);
     }
 
@@ -149,11 +162,12 @@ class SaleApiIT {
     private MvcTestResult hold(String saleId, String customerId, int quantity, String pass) {
         return mvc.post()
                 .uri("/api/sales/" + saleId + "/holds")
+                .header("X-Customer-Id", customerId)
                 .header("Queue-Pass", pass)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                        {"customerId": "%s", "quantity": %d}
-                        """.formatted(customerId, quantity))
+                        {"quantity": %d}
+                        """.formatted(quantity))
                 .exchange();
     }
 
