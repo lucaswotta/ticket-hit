@@ -101,7 +101,7 @@ flowchart LR
 
 | Serviço | Responsabilidade | Estado |
 |---|---|---|
-| `gateway` | porta única: roteamento, validação do JWT, rate limit | Redis |
+| `gateway` | porta única: roteamento, validação do JWT, identidade do comprador, rate limit | Redis |
 | Keycloak | cadastro, login e emissão de tokens OIDC | PostgreSQL |
 | `queue` | sala de espera, sorteio, posição, taxa de liberação, emissão do passe | Redis |
 | `ticketing` | estoque, hold, expiração, compra | PostgreSQL |
@@ -157,11 +157,15 @@ sequenceDiagram
 
 ## Segurança
 
-- Login por OIDC no Keycloak. O `gateway` valida o JWT, e cada serviço valida de novo o que recebe.
-- O passe de acesso é assinado pela `queue` e tem prazo curto.
-- Rate limit por conta e por IP no `gateway`, com estado no Redis.
+- Login por OIDC no Keycloak: o site usa o fluxo de código com PKCE, sem password grant; o `simulator` usa client credentials. Ver ADR 0008.
+- Só o `gateway` valida o token do Keycloak (assinatura, emissor e audiência `ticket-hit-api`). Ele descarta o `X-Customer-Id` enviado pelo cliente e grava o comprador resolvido do token. Os serviços leem o comprador desse header e não ficam expostos fora da rede interna.
+- O `simulator`, e só ele, age em nome dos bots com `X-Act-As: bot-<número>`. Um usuário real nunca pode ser personificado.
+- Cada comprador só vê e paga os próprios holds e só lê a própria entrada na fila (`/entries/me`). Recurso de outra pessoa responde 404.
+- O `payment` não tem rota no `gateway`.
+- O passe de acesso é assinado pela `queue` (ES256) e tem prazo de 2 minutos. Ver ADR 0007.
+- Rate limit por comprador nas rotas de compra e por IP nas rotas públicas, com estado no Redis.
 - Dados do formulário são gerados pela demo; nenhum dado pessoal real é coletado.
-- Segredos ficam fora do repositório, em variáveis de ambiente.
+- Segredos ficam fora do repositório, no `.env` gerado por `infra/generate-env.sh`.
 
 ## Raio-x
 
