@@ -3,7 +3,9 @@ package dev.lucaswotta.tickethit.ticketing.web;
 import dev.lucaswotta.tickethit.ticketing.hold.HoldNotFoundException;
 import dev.lucaswotta.tickethit.ticketing.hold.HoldNotPayableException;
 import dev.lucaswotta.tickethit.ticketing.hold.InvalidQuantityException;
+import dev.lucaswotta.tickethit.ticketing.hold.PassAlreadyUsedException;
 import dev.lucaswotta.tickethit.ticketing.hold.SoldOutException;
+import dev.lucaswotta.tickethit.ticketing.pass.InvalidPassException;
 import dev.lucaswotta.tickethit.ticketing.payment.PaymentUnavailableException;
 import dev.lucaswotta.tickethit.ticketing.sale.SaleNotFoundException;
 import org.springframework.http.HttpHeaders;
@@ -39,6 +41,16 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(HoldNotPayableException.class)
     ProblemDetail notPayable(HoldNotPayableException exception) {
         return problem(HttpStatus.CONFLICT, "HOLD_NOT_PAYABLE", exception);
+    }
+
+    @ExceptionHandler(InvalidPassException.class)
+    ProblemDetail invalidPass(InvalidPassException exception) {
+        return problem(HttpStatus.FORBIDDEN, "INVALID_PASS", exception);
+    }
+
+    @ExceptionHandler(PassAlreadyUsedException.class)
+    ProblemDetail passAlreadyUsed(PassAlreadyUsedException exception) {
+        return problem(HttpStatus.CONFLICT, "PASS_ALREADY_USED", exception);
     }
 
     @ExceptionHandler(PaymentUnavailableException.class)

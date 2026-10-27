@@ -15,6 +15,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -49,15 +50,22 @@ public class HoldService {
     // Retirada do estoque e criação do hold na mesma transação: se o INSERT
     // falhar, os ingressos voltam ao estoque no rollback.
     @Transactional
-    public Hold hold(UUID saleId, String customerId, int quantity) {
+    public Hold hold(UUID saleId, String customerId, int quantity, UUID passId) {
         if (quantity < 1 || quantity > properties.maxQuantity()) {
             throw new InvalidQuantityException(quantity, properties.maxQuantity());
         }
         Sale sale = sales.find(saleId).orElseThrow(() -> new SaleNotFoundException(saleId));
+        if (holds.passUsed(saleId, passId)) {
+            throw new PassAlreadyUsedException(saleId);
+        }
         if (!inventories.get(sale.inventoryStrategy()).tryWithdraw(saleId, quantity)) {
             throw new SoldOutException(saleId, quantity);
         }
-        return holds.create(saleId, customerId, quantity, clock.instant().plus(properties.duration()));
+        try {
+            return holds.create(saleId, customerId, quantity, passId, clock.instant().plus(properties.duration()));
+        } catch (DuplicateKeyException concurrentUseOfThePass) {
+            throw new PassAlreadyUsedException(saleId);
+        }
     }
 
     public Hold find(UUID holdId) {
