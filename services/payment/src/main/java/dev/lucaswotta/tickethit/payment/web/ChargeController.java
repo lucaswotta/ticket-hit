@@ -26,7 +26,7 @@ class ChargeController {
         this.gateway = gateway;
     }
 
-    // 202: a cobrança é aceita e decidida depois; o resultado sai em payment.events.
+    // 202: a cobrança é aceita e decidida depois; o resultado sai em payment-events.
     @PostMapping("/api/charges")
     ResponseEntity<ChargeResponse> charge(
             @RequestHeader("Idempotency-Key") @NotBlank @Size(max = 255) String idempotencyKey,

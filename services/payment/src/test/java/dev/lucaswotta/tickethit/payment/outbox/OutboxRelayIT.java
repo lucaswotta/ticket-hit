@@ -23,7 +23,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @IntegrationTest
 class OutboxRelayIT {
 
-    private static final String TOPIC = "payment.events";
+    private static final String TOPIC = "payment-events";
 
     @Autowired
     Outbox outbox;

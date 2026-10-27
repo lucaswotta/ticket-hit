@@ -41,6 +41,8 @@ jobs:
             echo "$name=$(openssl rand -hex 24)"
           done > .env
       - run: docker compose up -d --wait --wait-timeout 300
+      # O --wait não espera containers de execução única; o wait devolve o código de saída.
+      - run: docker compose wait kafka-init
       - run: infra/smoke-test.sh
       - if: failure()
         run: docker compose logs
