@@ -1,0 +1,76 @@
+{
+  "realm": "ticket-hit",
+  "enabled": true,
+  "sslRequired": "${KEYCLOAK_SSL_REQUIRED}",
+  "registrationAllowed": false,
+  "bruteForceProtected": true,
+  "passwordPolicy": "length(12)",
+  "accessTokenLifespan": 300,
+  "roles": {
+    "realm": [
+      {
+        "name": "simulator",
+        "description": "Cria vendas e filas e age em nome dos bots (X-Act-As com prefixo bot-)."
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "web",
+      "name": "Site do festival",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": ["http://localhost:5173/*"],
+      "webOrigins": ["http://localhost:5173"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:5173/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "audiencia-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "ticket-hit-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "simulator",
+      "name": "Simulador de bots",
+      "publicClient": false,
+      "secret": "${KEYCLOAK_SIMULATOR_SECRET}",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": true,
+      "protocolMappers": [
+        {
+          "name": "audiencia-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "ticket-hit-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "service-account-simulator",
+      "enabled": true,
+      "serviceAccountClientId": "simulator",
+      "realmRoles": ["default-roles-ticket-hit", "simulator"]
+    }
+  ]
+}

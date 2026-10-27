@@ -1,6 +1,7 @@
 #!/bin/sh
 # Gera o .env com senhas aleatórias e o par de chaves EC P-256 do passe da fila.
-# Os nomes vêm do .env.example, que é a lista oficial de variáveis.
+# Os nomes vêm do .env.example, que é a lista oficial de variáveis; as que já
+# têm valor lá são configuração e são copiadas como estão.
 set -eu
 cd "$(dirname "$0")/.."
 
@@ -16,7 +17,11 @@ openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 \
     | openssl pkcs8 -topk8 -nocrypt -outform DER -out "$key"
 
 umask 077
-grep -oE '^[A-Z_]+' .env.example | while read -r name; do
+grep -E '^[A-Z_]+=' .env.example | while IFS='=' read -r name default; do
+    if [ -n "$default" ]; then
+        echo "$name=$default"
+        continue
+    fi
     case "$name" in
         QUEUE_PASS_PRIVATE_KEY) echo "$name=$(openssl base64 -A < "$key")" ;;
         QUEUE_PASS_PUBLIC_KEY) echo "$name=$(openssl pkey -inform DER -in "$key" -pubout -outform DER | openssl base64 -A)" ;;

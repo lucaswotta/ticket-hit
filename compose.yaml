@@ -81,8 +81,14 @@ services:
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.8.1
-    command: start-dev
+    # O realm é importado só se ainda não existir; mudanças depois disso vão
+    # pelo console ou pelo kcadm.
+    command: start-dev --import-realm
+    volumes:
+      - ./infra/keycloak:/opt/keycloak/data/import:ro
     environment:
+      KEYCLOAK_SIMULATOR_SECRET: ${KEYCLOAK_SIMULATOR_SECRET:?defina no .env}
+      KEYCLOAK_SSL_REQUIRED: ${KEYCLOAK_SSL_REQUIRED:-external}
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
       KC_DB_USERNAME: keycloak
