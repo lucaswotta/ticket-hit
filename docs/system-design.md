@@ -18,7 +18,10 @@ Fluxo da visita:
 3. Na abertura, o sorteio define a posição de cada um e a fila começa a andar, com o relógio da demo acelerado.
 4. Quando o visitante é liberado, o formulário de compra se preenche sozinho com dados fictícios e o botão "Comprar" é habilitado.
 5. Se ele clicar antes de o estoque acabar, compra. Se demorar, vê "esgotado".
-6. No fim, um replay mostra a linha do tempo do que aconteceu no backend.
+6. O resultado compara o visitante com os bots: a ordem da compra dele ("você levou o ingresso 442 de 500"), o tempo entre o botão habilitado e o clique, e o tempo médio dos bots. Quem perdeu vê quanto tempo faltou.
+7. No fim, um replay mostra a linha do tempo do que aconteceu no backend.
+
+A ordem da compra e os tempos são medidos no servidor, a partir do hold e do pedido de compra, e não pelo relógio do navegador.
 
 Regras da demonstração:
 
@@ -26,6 +29,13 @@ Regras da demonstração:
 - O raio-x mostra eventos emitidos de fato pelos serviços. Há dois modos alternáveis: narrado (eventos exibidos com atraso e legenda) e bruto (tempo real). O modo inicial é o narrado.
 - Cada visitante tem uma sala privada. Quando a máquina atinge o limite de salas simultâneas, o visitante seguinte espera numa fila de entrada da própria demo.
 - No celular, o site ocupa a tela e o raio-x fica numa gaveta inferior com posição na fila, estoque, bots ativos e o último evento. Arrastar a gaveta para cima abre o raio-x completo.
+
+Controles do raio-x:
+
+- Modo sem proteção: a sala roda a venda com a estratégia ingênua (ler o estoque, conferir na aplicação, gravar). O raio-x mostra o estoque ficando negativo e mais ingressos vendidos do que existem. Ao religar a proteção, a mesma carga termina com estoque zero.
+- Botão de caos: derruba um serviço só da sala do visitante, nunca da máquina inteira. Com o `payment` fora, o pagamento fica pendente e é retomado sem cobrança duplicada; com a `queue` fora, quem já tem passe continua comprando.
+- Link para o código: cada tipo de evento aponta para a linha do repositório que o produz.
+- Bots abusivos: parte dos bots tenta forjar o passe, reaproveitar o passe de outro comprador ou estourar o rate limit. As tentativas aparecem bloqueadas no raio-x.
 
 ## Jornada do comprador
 
@@ -183,7 +193,8 @@ Cada serviço publica eventos de telemetria marcados com o identificador da sala
 - Versões de Java e Spring Boot, ferramenta de build e stack do `web`.
 - Mecânica do sorteio: momento do sorteio e como a posição é guardada no Redis.
 - Taxa de liberação, validade do passe e limite de ingressos por comprador.
-- Perfil dos bots: só compradores comuns ou também bots abusivos que o sistema bloqueia.
+- Proporção de bots abusivos e tipos de ataque simulados.
+- Texto da tela de resultado e tamanho do estoque da sala da demo.
 - Formato e algoritmo de assinatura do passe.
 - Fonte do replay: log do Kafka ou buffer do `xray`.
 - Observabilidade: métricas e tracing.
