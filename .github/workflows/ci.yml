@@ -35,11 +35,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Gerar .env com senhas descartáveis
-        run: |
-          grep -oE '^[A-Z_]+' .env.example | while read -r name; do
-            echo "$name=$(openssl rand -hex 24)"
-          done > .env
+      - name: Gerar .env com senhas e chaves descartáveis
+        run: infra/generate-env.sh
       - run: docker compose up -d --wait --wait-timeout 300
       # O --wait não espera containers de execução única, e o compose wait do
       # runner não acha container que já saiu. Espera o estado e exige saída 0.
