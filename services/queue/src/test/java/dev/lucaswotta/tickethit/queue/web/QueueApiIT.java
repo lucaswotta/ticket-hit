@@ -56,7 +56,7 @@ class QueueApiIT {
         UUID saleId = UUID.randomUUID();
         createQueue(saleId, 10);
 
-        assertThat(mvc.get().uri("/api/queues/{id}/entries/ninguem", saleId))
+        assertThat(mvc.get().uri("/api/queues/{id}/entries/me", saleId).header("X-Customer-Id", "ninguem"))
                 .hasStatus(HttpStatus.NOT_FOUND)
                 .bodyJson()
                 .extractingPath("$.code")
@@ -66,6 +66,14 @@ class QueueApiIT {
                 .bodyJson()
                 .extractingPath("$.code")
                 .isEqualTo("QUEUE_NOT_FOUND");
+    }
+
+    @Test
+    void joinWithoutCustomerIsBadRequest() {
+        UUID saleId = UUID.randomUUID();
+        createQueue(saleId, 10);
+
+        assertThat(mvc.post().uri("/api/queues/{id}/entries", saleId)).hasStatus(HttpStatus.BAD_REQUEST);
     }
 
     @Test
@@ -86,10 +94,7 @@ class QueueApiIT {
     private MvcTestResult join(UUID saleId, String customerId) {
         return mvc.post()
                 .uri("/api/queues/{id}/entries", saleId)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                        {"customerId": "%s"}
-                        """.formatted(customerId))
+                .header("X-Customer-Id", customerId)
                 .exchange();
     }
 }
