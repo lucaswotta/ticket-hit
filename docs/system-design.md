@@ -18,7 +18,10 @@ Fluxo da visita:
 3. Na abertura, o sorteio define a posição de cada um e a fila começa a andar, com o relógio da demo acelerado.
 4. Quando o visitante é liberado, o formulário de compra se preenche sozinho com dados fictícios e o botão "Comprar" é habilitado.
 5. Se ele clicar antes de o estoque acabar, compra. Se demorar, vê "esgotado".
-6. No fim, um replay mostra a linha do tempo do que aconteceu no backend.
+6. O resultado compara o visitante com os bots: a ordem da compra dele ("você levou o ingresso 442 de 500"), o tempo entre o botão habilitado e o clique, e o tempo médio dos bots. Quem perdeu vê quanto tempo faltou.
+7. No fim, um replay mostra a linha do tempo do que aconteceu no backend.
+
+A ordem da compra e os tempos são medidos no servidor, a partir do hold e do pedido de compra, e não pelo relógio do navegador.
 
 Regras da demonstração:
 
@@ -184,6 +187,7 @@ Cada serviço publica eventos de telemetria marcados com o identificador da sala
 - Mecânica do sorteio: momento do sorteio e como a posição é guardada no Redis.
 - Taxa de liberação, validade do passe e limite de ingressos por comprador.
 - Perfil dos bots: só compradores comuns ou também bots abusivos que o sistema bloqueia.
+- Texto da tela de resultado e tamanho do estoque da sala da demo.
 - Formato e algoritmo de assinatura do passe.
 - Fonte do replay: log do Kafka ou buffer do `xray`.
 - Observabilidade: métricas e tracing.
