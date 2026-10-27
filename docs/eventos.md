@@ -2,7 +2,9 @@
 
 Contratos dos tópicos do Kafka. Cada serviço declara as próprias classes para ler e escrever; o contrato é este documento, sem biblioteca compartilhada entre serviços.
 
-## `payment.events`
+Os tópicos são criados por `infra/kafka/create-topics.sh`, antes de qualquer serviço subir. O broker não cria tópico automaticamente.
+
+## `payment-events`
 
 Produtor: `payment`, via outbox (ADR 0004). Consumidor: `ticketing`.
 
@@ -29,3 +31,7 @@ Exemplo:
 ```
 
 Campos novos podem ser acrescentados; consumidores ignoram campos que não conhecem. Remover ou mudar o tipo de um campo exige um tópico novo.
+
+## `payment-events-dlt`
+
+Mensagens de `payment-events` que o `ticketing` não conseguiu processar: JSON inválido vai direto; falha temporária vai depois de 5 tentativas com 1 s de intervalo. Cada mensagem cai na partição de mesmo número da origem, com os headers de exceção do Spring Kafka. Partições: 3.
