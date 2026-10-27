@@ -1,0 +1,57 @@
+package dev.lucaswotta.tickethit.gateway.security;
+
+import org.springframework.cloud.gateway.filter.GatewayFilterChain;
+import org.springframework.cloud.gateway.filter.GlobalFilter;
+import org.springframework.core.Ordered;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Component;
+import org.springframework.web.server.ServerWebExchange;
+import reactor.core.publisher.Mono;
+
+/**
+ * Os serviços confiam no {@code X-Customer-Id} porque só o gateway fala com
+ * eles. Por isso o valor que vem do cliente é sempre descartado e trocado pelo
+ * comprador resolvido a partir do token.
+ */
+@Component
+class CustomerIdentityFilter implements GlobalFilter, Ordered {
+
+    static final String CUSTOMER_ID = "X-Customer-Id";
+
+    private final CustomerResolver customers;
+    private final ProblemResponses problems;
+
+    CustomerIdentityFilter(CustomerResolver customers, ProblemResponses problems) {
+        this.customers = customers;
+        this.problems = problems;
+    }
+
+    @Override
+    public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
+        return customers.resolve(exchange)
+                .map(customer -> withCustomer(exchange, customer))
+                .defaultIfEmpty(withCustomer(exchange, null))
+                .flatMap(chain::filter)
+                .onErrorResume(ActAsForbiddenException.class, forbidden -> problems.write(
+                        exchange, HttpStatus.FORBIDDEN, "ACT_AS_FORBIDDEN", forbidden.getMessage()));
+    }
+
+    // Logo depois do UpstreamUnavailableFilter e antes do rate limiter e do
+    // roteamento, para nenhum filtro ver a identidade enviada pelo cliente.
+    @Override
+    public int getOrder() {
+        return Ordered.HIGHEST_PRECEDENCE + 1;
+    }
+
+    private static ServerWebExchange withCustomer(ServerWebExchange exchange, String customer) {
+        return exchange.mutate()
+                .request(request -> request.headers(headers -> {
+                    headers.remove(CUSTOMER_ID);
+                    headers.remove(CustomerResolver.ACT_AS);
+                    if (customer != null) {
+                        headers.set(CUSTOMER_ID, customer);
+                    }
+                }))
+                .build();
+    }
+}

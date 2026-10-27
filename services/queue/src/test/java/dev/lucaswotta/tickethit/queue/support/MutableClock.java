@@ -5,13 +5,15 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 
 /** Relógio que só anda quando o teste manda, para testar prazos sem esperar. */
 public class MutableClock extends Clock {
 
-    // Com nanossegundos, mais preciso que o timestamptz do PostgreSQL, para os
+    // Parte do horário real, porque o Redis expira chaves pelo próprio relógio,
+    // e tem nanossegundos, mais preciso que o timestamptz do PostgreSQL, para os
     // testes pegarem diferença entre o valor em memória e o gravado.
-    private volatile Instant now = Instant.parse("2026-10-27T21:00:00.123456789Z");
+    private volatile Instant now = Instant.now().truncatedTo(ChronoUnit.SECONDS).plusNanos(123_456_789);
 
     public void advance(Duration duration) {
         now = now.plus(duration);

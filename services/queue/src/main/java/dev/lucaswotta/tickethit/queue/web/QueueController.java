@@ -11,11 +11,14 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.util.UriComponentsBuilder;
 
 @RestController
 class QueueController {
+
+    private static final String CUSTOMER_ID = "X-Customer-Id";
 
     private final QueueService queueService;
 
@@ -36,16 +39,17 @@ class QueueController {
     }
 
     // 201 na primeira entrada, 200 quando o comprador já estava: entrar de novo
-    // não muda o lugar.
+    // não muda o lugar. O comprador vem do gateway, que o tira do token.
     @PostMapping("/api/queues/{saleId}/entries")
-    ResponseEntity<Entry> join(@PathVariable UUID saleId, @Valid @RequestBody JoinRequest request) {
-        boolean joined = queueService.join(saleId, request.customerId());
+    ResponseEntity<Entry> join(@PathVariable UUID saleId, @RequestHeader(CUSTOMER_ID) String customerId) {
+        boolean joined = queueService.join(saleId, customerId);
         return ResponseEntity.status(joined ? HttpStatus.CREATED : HttpStatus.OK)
-                .body(queueService.entry(saleId, request.customerId()));
+                .body(queueService.entry(saleId, customerId));
     }
 
-    @GetMapping("/api/queues/{saleId}/entries/{customerId}")
-    Entry entry(@PathVariable UUID saleId, @PathVariable String customerId) {
+    // Só a própria entrada: com o id na URL, qualquer um leria o passe de outro.
+    @GetMapping("/api/queues/{saleId}/entries/me")
+    Entry entry(@PathVariable UUID saleId, @RequestHeader(CUSTOMER_ID) String customerId) {
         return queueService.entry(saleId, customerId);
     }
 }
