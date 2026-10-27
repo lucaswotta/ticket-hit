@@ -5,13 +5,18 @@ import java.sql.SQLException;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.Arrays;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
 @Repository
 class HoldRepository {
+
+    private static final String COLUMNS =
+            "id, sale_id, customer_id, quantity, status, expires_at, created_at, payment_requested_at, last_ticket_number";
 
     private final JdbcClient jdbc;
 
@@ -25,8 +30,8 @@ class HoldRepository {
         return jdbc.sql("""
                         insert into hold (sale_id, customer_id, quantity, status, expires_at)
                         values (:saleId, :customerId, :quantity, 'HELD', :expiresAt)
-                        returning id, sale_id, customer_id, quantity, status, expires_at
-                        """)
+                        returning %s
+                        """.formatted(COLUMNS))
                 .param("saleId", saleId)
                 .param("customerId", customerId)
                 .param("quantity", quantity)
@@ -37,13 +42,90 @@ class HoldRepository {
 
     Optional<Hold> find(UUID holdId) {
         return jdbc.sql("""
-                        select id, sale_id, customer_id, quantity, status, expires_at
+                        select %s
                           from hold
                          where id = :holdId
-                        """)
+                        """.formatted(COLUMNS))
                 .param("holdId", holdId)
                 .query(HoldRepository::mapHold)
                 .optional();
+    }
+
+    Optional<Hold> startPayment(UUID holdId, Instant now) {
+        return jdbc.sql("""
+                        update hold
+                           set status = 'PAYING', payment_requested_at = :now
+                         where id = :holdId
+                           and status = 'HELD'
+                           and expires_at > :now
+                        returning %s
+                        """.formatted(COLUMNS))
+                .param("holdId", holdId)
+                .param("now", utc(now))
+                .query(HoldRepository::mapHold)
+                .optional();
+    }
+
+    void revertPayment(UUID holdId) {
+        jdbc.sql("update hold set status = 'HELD', payment_requested_at = null where id = :holdId and status = 'PAYING'")
+                .param("holdId", holdId)
+                .update();
+    }
+
+    /**
+     * Confirma o hold e numera a compra pelo total vendido. O UPDATE em sale
+     * trava a linha da venda, então duas confirmações simultâneas recebem
+     * números diferentes. Um evento repetido não acha o hold em HELD ou
+     * PAYING e não muda nada.
+     */
+    Optional<Hold> confirm(UUID holdId, Instant now) {
+        return jdbc.sql("""
+                        with target as (
+                            select id, sale_id, quantity
+                              from hold
+                             where id = :holdId
+                               and status in ('HELD', 'PAYING')
+                               for update
+                        ),
+                        sold as (
+                            update sale
+                               set sold_tickets = sold_tickets + target.quantity
+                              from target
+                             where sale.id = target.sale_id
+                         returning sale.sold_tickets
+                        )
+                        update hold
+                           set status = 'CONFIRMED',
+                               confirmed_at = :now,
+                               last_ticket_number = (select sold_tickets from sold)
+                          from target
+                         where hold.id = target.id
+                        returning %s
+                        """.formatted(prefixed("hold.")))
+                .param("holdId", holdId)
+                .param("now", utc(now))
+                .query(HoldRepository::mapHold)
+                .optional();
+    }
+
+    /** Libera o hold e devolve os ingressos ao estoque. Devolve false se não havia o que liberar. */
+    boolean release(UUID holdId) {
+        int returned = jdbc.sql("""
+                        with released as (
+                            update hold
+                               set status = 'RELEASED'
+                             where id = :holdId
+                               and status in ('HELD', 'PAYING')
+                         returning sale_id, quantity
+                        )
+                        update sale
+                           set available_tickets = available_tickets + released.quantity
+                          from released
+                         where sale.id = released.sale_id
+                        """)
+                .param("holdId", holdId)
+                .update();
+        return returned == 1;
     }
 
     /**
@@ -92,7 +174,20 @@ class HoldRepository {
                 rs.getString("customer_id"),
                 rs.getInt("quantity"),
                 HoldStatus.valueOf(rs.getString("status")),
-                rs.getObject("expires_at", OffsetDateTime.class).toInstant());
+                instant(rs, "expires_at"),
+                instant(rs, "created_at"),
+                instant(rs, "payment_requested_at"),
+                rs.getObject("last_ticket_number", Integer.class));
+    }
+
+    // No UPDATE ... FROM target, id, sale_id e quantity existem nas duas tabelas.
+    private static String prefixed(String prefix) {
+        return Arrays.stream(COLUMNS.split(", ")).map(column -> prefix + column).collect(Collectors.joining(", "));
+    }
+
+    private static Instant instant(ResultSet rs, String column) throws SQLException {
+        OffsetDateTime value = rs.getObject(column, OffsetDateTime.class);
+        return value == null ? null : value.toInstant();
     }
 
     private static OffsetDateTime utc(Instant instant) {

@@ -19,7 +19,7 @@ docker compose exec -T redis sh -c 'unset REDISCLI_AUTH; redis-cli ping' | grep 
     || fail "Redis aceita comando sem senha"
 
 docker compose exec -T kafka /opt/kafka/bin/kafka-topics.sh \
-    --bootstrap-server localhost:9092 --list > /dev/null \
-    || fail "Kafka não responde"
+    --bootstrap-server localhost:9092 --describe --topic payment-events | grep -q "PartitionCount: 3" \
+    || fail "tópico payment-events ausente ou sem 3 partições"
 
 echo "infraestrutura ok"

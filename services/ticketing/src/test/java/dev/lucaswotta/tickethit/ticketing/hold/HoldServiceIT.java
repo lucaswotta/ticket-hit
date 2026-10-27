@@ -86,7 +86,7 @@ class HoldServiceIT {
         Hold active = holdService.hold(saleId, "bia", 2);
         clock.advance(Duration.ofMinutes(5));
 
-        holdService.expireDue();
+        expireAllDue();
 
         assertThat(holdService.find(due.id()).status()).isEqualTo(HoldStatus.EXPIRED);
         assertThat(holdService.find(active.id()).status()).isEqualTo(HoldStatus.HELD);
@@ -174,5 +174,11 @@ class HoldServiceIT {
                 future.get();
             }
         }
+    }
+
+    // Os testes dividem banco e relógio, então pode haver mais holds vencidos
+    // que um lote do job; expira lote a lote até não sobrar nenhum.
+    private void expireAllDue() {
+        while (holdService.expireDue() > 0) {}
     }
 }

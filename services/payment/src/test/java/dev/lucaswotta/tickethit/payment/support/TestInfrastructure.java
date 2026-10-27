@@ -1,9 +1,11 @@
 package dev.lucaswotta.tickethit.payment.support;
 
+import org.apache.kafka.clients.admin.NewTopic;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
+import org.springframework.kafka.config.TopicBuilder;
 import org.testcontainers.kafka.KafkaContainer;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
@@ -20,6 +22,12 @@ class TestInfrastructure {
     @ServiceConnection
     KafkaContainer kafka() {
         return new KafkaContainer("apache/kafka:4.3.2");
+    }
+
+    // Fora dos testes, os tópicos vêm de infra/kafka/create-topics.sh.
+    @Bean
+    NewTopic paymentEvents() {
+        return TopicBuilder.name("payment-events").partitions(3).replicas(1).build();
     }
 
     @Bean

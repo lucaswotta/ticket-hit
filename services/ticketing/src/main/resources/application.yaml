@@ -5,6 +5,11 @@ spring:
     url: jdbc:postgresql://${TICKETING_DB_HOST:localhost}:5432/ticketing
     username: ticketing
     password: ${TICKETING_DB_PASSWORD:}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: ticketing
+      auto-offset-reset: earliest
   mvc:
     problemdetails:
       enabled: true
@@ -18,3 +23,9 @@ ticketing:
     max-quantity: 4
     expiration-batch-size: 500
     expiration-interval: 1s
+  payment:
+    base-url: ${PAYMENT_BASE_URL:http://localhost:8083}
+    connect-timeout: 1s
+    read-timeout: 2s
+    max-retries: 3
+    retry-delay: 200ms
