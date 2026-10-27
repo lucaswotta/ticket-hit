@@ -190,11 +190,12 @@ Cada serviço publica eventos de telemetria marcados com o identificador da sala
 ## Em aberto
 
 - Nome do festival e identidade visual.
-- Versões de Java e Spring Boot, ferramenta de build e stack do `web`.
-- Mecânica do sorteio: momento do sorteio e como a posição é guardada no Redis.
-- Taxa de liberação, validade do passe e limite de ingressos por comprador.
+- Stack do `web`.
 - Proporção de bots abusivos e tipos de ataque simulados.
 - Texto da tela de resultado e tamanho do estoque da sala da demo.
-- Formato e algoritmo de assinatura do passe.
 - Fonte do replay: log do Kafka ou buffer do `xray`.
 - Observabilidade: métricas e tracing.
+- Aviso de esgotado para quem ainda está na fila.
+- Estorno de pagamento aprovado depois que o hold expirou.
+
+Decididos: Java 25, Spring Boot 4.1 e Maven; sorteio, liberação e passe na ADR 0007; limite de 4 ingressos por hold e um hold por passe.
