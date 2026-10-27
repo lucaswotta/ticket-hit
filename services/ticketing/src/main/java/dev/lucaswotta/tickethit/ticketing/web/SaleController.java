@@ -1,0 +1,52 @@
+package dev.lucaswotta.tickethit.ticketing.web;
+
+import dev.lucaswotta.tickethit.ticketing.hold.Hold;
+import dev.lucaswotta.tickethit.ticketing.hold.HoldService;
+import dev.lucaswotta.tickethit.ticketing.sale.Sale;
+import dev.lucaswotta.tickethit.ticketing.sale.SaleNotFoundException;
+import dev.lucaswotta.tickethit.ticketing.sale.SaleRepository;
+import jakarta.validation.Valid;
+import java.util.UUID;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.util.UriComponentsBuilder;
+
+@RestController
+class SaleController {
+
+    private final SaleRepository sales;
+    private final HoldService holdService;
+
+    SaleController(SaleRepository sales, HoldService holdService) {
+        this.sales = sales;
+        this.holdService = holdService;
+    }
+
+    @PostMapping("/api/sales")
+    ResponseEntity<Sale> open(@Valid @RequestBody OpenSaleRequest request, UriComponentsBuilder uri) {
+        UUID saleId = sales.open(request.name(), request.totalTickets(), request.inventoryStrategyOrDefault());
+        Sale sale = sales.find(saleId).orElseThrow();
+        return ResponseEntity.created(uri.path("/api/sales/{id}").build(saleId)).body(sale);
+    }
+
+    @GetMapping("/api/sales/{saleId}")
+    Sale find(@PathVariable UUID saleId) {
+        return sales.find(saleId).orElseThrow(() -> new SaleNotFoundException(saleId));
+    }
+
+    @PostMapping("/api/sales/{saleId}/holds")
+    ResponseEntity<Hold> hold(
+            @PathVariable UUID saleId, @Valid @RequestBody HoldRequest request, UriComponentsBuilder uri) {
+        Hold hold = holdService.hold(saleId, request.customerId(), request.quantity());
+        return ResponseEntity.created(uri.path("/api/holds/{id}").build(hold.id())).body(hold);
+    }
+
+    @GetMapping("/api/holds/{holdId}")
+    Hold findHold(@PathVariable UUID holdId) {
+        return holdService.find(holdId);
+    }
+}

@@ -1,0 +1,20 @@
+spring:
+  application:
+    name: ticketing
+  datasource:
+    url: jdbc:postgresql://${TICKETING_DB_HOST:localhost}:5432/ticketing
+    username: ticketing
+    password: ${TICKETING_DB_PASSWORD:}
+  mvc:
+    problemdetails:
+      enabled: true
+
+server:
+  port: 8082
+
+ticketing:
+  hold:
+    duration: 10m
+    max-quantity: 4
+    expiration-batch-size: 500
+    expiration-interval: 1s

@@ -27,4 +27,40 @@
     <properties>
         <java.version>25</java.version>
     </properties>
+    <!-- O JDK vai proibir o que o Mockito e o JNA do Testcontainers fazem sem
+         aviso: o Mockito se anexar como agente e o JNA carregar código nativo.
+         Os dois ficam declarados aqui. -->
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <configuration>
+                        <argLine>-javaagent:${org.mockito:mockito-core:jar} -Xshare:off --enable-native-access=ALL-UNNAMED</argLine>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-failsafe-plugin</artifactId>
+                    <configuration>
+                        <argLine>-javaagent:${org.mockito:mockito-core:jar} -Xshare:off --enable-native-access=ALL-UNNAMED</argLine>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>properties</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 </project>
