@@ -42,7 +42,7 @@ class PaymentEventListenerIT {
 
     @Test
     void approvedEventConfirmsHoldAndIgnoresUnknownFields() throws Exception {
-        Hold hold = holdService.hold(sales.open("Noite 1", 10, InventoryStrategy.ATOMIC), "ana", 2);
+        Hold hold = holdService.hold(sales.open("Noite 1", 10, InventoryStrategy.ATOMIC), "ana", 2, UUID.randomUUID());
 
         publish(hold.id(), """
                 {"type": "PAYMENT_APPROVED", "chargeId": "%s", "holdId": "%s",
@@ -59,7 +59,7 @@ class PaymentEventListenerIT {
     @Test
     void declinedEventReleasesTickets() throws Exception {
         UUID saleId = sales.open("Noite 1", 10, InventoryStrategy.ATOMIC);
-        Hold hold = holdService.hold(saleId, "ana", 2);
+        Hold hold = holdService.hold(saleId, "ana", 2, UUID.randomUUID());
 
         publish(hold.id(), """
                 {"type": "PAYMENT_DECLINED", "chargeId": "%s", "holdId": "%s", "occurredAt": "2026-10-27T21:00:00Z"}

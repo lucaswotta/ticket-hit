@@ -1,0 +1,24 @@
+spring:
+  application:
+    name: queue
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: 6379
+      password: ${REDIS_PASSWORD:}
+  mvc:
+    problemdetails:
+      enabled: true
+
+server:
+  port: 8081
+
+queue:
+  admission-interval: 200ms
+  room-ttl: 2h
+  pass:
+    ttl: 2m
+    # Par EC P-256 em base64 (privada em PKCS#8 DER, pública em X.509 DER),
+    # gerado por infra/generate-env.sh. O ticketing recebe só a pública.
+    private-key: ${QUEUE_PASS_PRIVATE_KEY:}
+    public-key: ${QUEUE_PASS_PUBLIC_KEY:}

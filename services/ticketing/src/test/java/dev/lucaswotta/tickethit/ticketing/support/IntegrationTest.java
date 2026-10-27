@@ -18,7 +18,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
-@SpringBootTest(properties = "ticketing.hold.expiration-enabled=false")
+@SpringBootTest(
+        properties = {"ticketing.hold.expiration-enabled=false", "ticketing.pass.public-key=" + TestPasses.PUBLIC_KEY})
 @Import(TestInfrastructure.class)
 @AutoConfigureMockMvc
 @MockitoBean(types = PaymentClient.class)

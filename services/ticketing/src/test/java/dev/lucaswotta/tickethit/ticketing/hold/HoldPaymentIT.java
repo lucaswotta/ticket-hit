@@ -52,7 +52,7 @@ class HoldPaymentIT {
 
     @Test
     void payMovesHoldToPayingAndChargesWithTheHold() {
-        Hold hold = holdService.hold(sales.open("Noite 1", 10, InventoryStrategy.ATOMIC), "ana", 2);
+        Hold hold = holdService.hold(sales.open("Noite 1", 10, InventoryStrategy.ATOMIC), "ana", 2, UUID.randomUUID());
 
         Hold paying = holdService.pay(hold.id());
 
@@ -63,7 +63,7 @@ class HoldPaymentIT {
 
     @Test
     void unavailablePaymentRevertsHoldToHeld() {
-        Hold hold = holdService.hold(sales.open("Noite 1", 10, InventoryStrategy.ATOMIC), "ana", 2);
+        Hold hold = holdService.hold(sales.open("Noite 1", 10, InventoryStrategy.ATOMIC), "ana", 2, UUID.randomUUID());
         doThrow(mock(PaymentUnavailableException.class)).when(paymentClient).charge(eq(hold.id()), any());
 
         assertThatThrownBy(() -> holdService.pay(hold.id())).isInstanceOf(PaymentUnavailableException.class);
@@ -73,7 +73,7 @@ class HoldPaymentIT {
 
     @Test
     void expiredHoldCannotBePaid() {
-        Hold hold = holdService.hold(sales.open("Noite 1", 10, InventoryStrategy.ATOMIC), "ana", 2);
+        Hold hold = holdService.hold(sales.open("Noite 1", 10, InventoryStrategy.ATOMIC), "ana", 2, UUID.randomUUID());
         clock.advance(Duration.ofMinutes(10));
 
         assertThatThrownBy(() -> holdService.pay(hold.id())).isInstanceOf(HoldNotPayableException.class);
@@ -82,7 +82,7 @@ class HoldPaymentIT {
     @Test
     void payingHoldIsNotExpired() {
         UUID saleId = sales.open("Noite 1", 10, InventoryStrategy.ATOMIC);
-        Hold hold = holdService.hold(saleId, "ana", 2);
+        Hold hold = holdService.hold(saleId, "ana", 2, UUID.randomUUID());
         holdService.pay(hold.id());
         clock.advance(Duration.ofMinutes(10));
 
@@ -95,8 +95,8 @@ class HoldPaymentIT {
     @Test
     void confirmNumbersThePurchaseAndRepeatedEventChangesNothing() {
         UUID saleId = sales.open("Noite 1", 10, InventoryStrategy.ATOMIC);
-        Hold first = holdService.hold(saleId, "ana", 3);
-        Hold second = holdService.hold(saleId, "bia", 2);
+        Hold first = holdService.hold(saleId, "ana", 3, UUID.randomUUID());
+        Hold second = holdService.hold(saleId, "bia", 2, UUID.randomUUID());
 
         holdService.confirm(first.id());
         holdService.confirm(second.id());
@@ -110,7 +110,7 @@ class HoldPaymentIT {
     @Test
     void releaseReturnsTicketsOnce() {
         UUID saleId = sales.open("Noite 1", 10, InventoryStrategy.ATOMIC);
-        Hold hold = holdService.hold(saleId, "ana", 3);
+        Hold hold = holdService.hold(saleId, "ana", 3, UUID.randomUUID());
 
         holdService.release(hold.id());
         holdService.release(hold.id());
@@ -122,7 +122,7 @@ class HoldPaymentIT {
     @Test
     void lateApprovalForExpiredHoldIssuesNoTicket() {
         UUID saleId = sales.open("Noite 1", 10, InventoryStrategy.ATOMIC);
-        Hold hold = holdService.hold(saleId, "ana", 3);
+        Hold hold = holdService.hold(saleId, "ana", 3, UUID.randomUUID());
         clock.advance(Duration.ofMinutes(10));
         expireAllDue();
 
@@ -137,7 +137,7 @@ class HoldPaymentIT {
         UUID saleId = sales.open("Noite 1", 100, InventoryStrategy.ATOMIC);
         List<UUID> holdIds = new ArrayList<>();
         for (int i = 0; i < 100; i++) {
-            holdIds.add(holdService.hold(saleId, "comprador-" + i, 1).id());
+            holdIds.add(holdService.hold(saleId, "comprador-" + i, 1, UUID.randomUUID()).id());
         }
 
         var start = new CountDownLatch(1);

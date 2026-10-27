@@ -2,6 +2,7 @@ package dev.lucaswotta.tickethit.ticketing.web;
 
 import dev.lucaswotta.tickethit.ticketing.hold.Hold;
 import dev.lucaswotta.tickethit.ticketing.hold.HoldService;
+import dev.lucaswotta.tickethit.ticketing.pass.PassVerifier;
 import dev.lucaswotta.tickethit.ticketing.sale.Sale;
 import dev.lucaswotta.tickethit.ticketing.sale.SaleNotFoundException;
 import dev.lucaswotta.tickethit.ticketing.sale.SaleRepository;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -20,10 +22,12 @@ class SaleController {
 
     private final SaleRepository sales;
     private final HoldService holdService;
+    private final PassVerifier passVerifier;
 
-    SaleController(SaleRepository sales, HoldService holdService) {
+    SaleController(SaleRepository sales, HoldService holdService, PassVerifier passVerifier) {
         this.sales = sales;
         this.holdService = holdService;
+        this.passVerifier = passVerifier;
     }
 
     @PostMapping("/api/sales")
@@ -38,10 +42,16 @@ class SaleController {
         return sales.find(saleId).orElseThrow(() -> new SaleNotFoundException(saleId));
     }
 
+    // O passe vem da queue: sem ele não se segura ingresso, e ele só vale para
+    // a venda e o comprador para os quais foi emitido.
     @PostMapping("/api/sales/{saleId}/holds")
     ResponseEntity<Hold> hold(
-            @PathVariable UUID saleId, @Valid @RequestBody HoldRequest request, UriComponentsBuilder uri) {
-        Hold hold = holdService.hold(saleId, request.customerId(), request.quantity());
+            @PathVariable UUID saleId,
+            @RequestHeader("Queue-Pass") String pass,
+            @Valid @RequestBody HoldRequest request,
+            UriComponentsBuilder uri) {
+        UUID passId = passVerifier.verify(pass, saleId, request.customerId());
+        Hold hold = holdService.hold(saleId, request.customerId(), request.quantity(), passId);
         return ResponseEntity.created(uri.path("/api/holds/{id}").build(hold.id())).body(hold);
     }
 

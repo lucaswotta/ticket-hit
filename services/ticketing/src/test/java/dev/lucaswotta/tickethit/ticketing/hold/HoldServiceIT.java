@@ -43,7 +43,7 @@ class HoldServiceIT {
     void holdWithdrawsTicketsAndExpiresInTenMinutes() {
         UUID saleId = sales.open("Noite 1", 10, InventoryStrategy.ATOMIC);
 
-        Hold hold = holdService.hold(saleId, "ana", 3);
+        Hold hold = holdService.hold(saleId, "ana", 3, UUID.randomUUID());
 
         assertThat(hold.status()).isEqualTo(HoldStatus.HELD);
         assertThat(hold.expiresAt()).isCloseTo(clock.instant().plus(HOLD_DURATION), within(1, ChronoUnit.MILLIS));
@@ -54,9 +54,9 @@ class HoldServiceIT {
     @Test
     void soldOutCreatesNoHold() {
         UUID saleId = sales.open("Noite 1", 2, InventoryStrategy.ATOMIC);
-        holdService.hold(saleId, "ana", 2);
+        holdService.hold(saleId, "ana", 2, UUID.randomUUID());
 
-        assertThatThrownBy(() -> holdService.hold(saleId, "bia", 1)).isInstanceOf(SoldOutException.class);
+        assertThatThrownBy(() -> holdService.hold(saleId, "bia", 1, UUID.randomUUID())).isInstanceOf(SoldOutException.class);
 
         assertThat(holdsOf(saleId)).isEqualTo(1);
         assertThat(sales.availableTickets(saleId)).isZero();
@@ -66,24 +66,57 @@ class HoldServiceIT {
     void quantityOutsideLimitIsRejectedBeforeTouchingStock() {
         UUID saleId = sales.open("Noite 1", 10, InventoryStrategy.ATOMIC);
 
-        assertThatThrownBy(() -> holdService.hold(saleId, "ana", 5)).isInstanceOf(InvalidQuantityException.class);
-        assertThatThrownBy(() -> holdService.hold(saleId, "ana", 0)).isInstanceOf(InvalidQuantityException.class);
+        assertThatThrownBy(() -> holdService.hold(saleId, "ana", 5, UUID.randomUUID())).isInstanceOf(InvalidQuantityException.class);
+        assertThatThrownBy(() -> holdService.hold(saleId, "ana", 0, UUID.randomUUID())).isInstanceOf(InvalidQuantityException.class);
 
         assertThat(sales.availableTickets(saleId)).isEqualTo(10);
     }
 
     @Test
+    void passAlreadyUsedIsRejectedBeforeTouchingStock() {
+        UUID saleId = sales.open("Noite 1", 10, InventoryStrategy.ATOMIC);
+        UUID passId = UUID.randomUUID();
+        holdService.hold(saleId, "ana", 2, passId);
+
+        assertThatThrownBy(() -> holdService.hold(saleId, "ana", 2, passId))
+                .isInstanceOf(PassAlreadyUsedException.class);
+
+        assertThat(sales.availableTickets(saleId)).isEqualTo(8);
+    }
+
+    // O mesmo passe em requisições simultâneas, como um bot disparando em
+    // paralelo. Todas passam pela conferência antes do INSERT; a constraint
+    // unique deixa só uma criar o hold, e as outras devolvem o estoque.
+    @Test
+    void concurrentHoldsWithTheSamePassCreateOne() throws Exception {
+        UUID saleId = sales.open("Noite 1", 100, InventoryStrategy.ATOMIC);
+        UUID passId = UUID.randomUUID();
+
+        runConcurrently(20, () -> {
+            try {
+                holdService.hold(saleId, "bot", 2, passId);
+                return true;
+            } catch (PassAlreadyUsedException rejected) {
+                return false;
+            }
+        });
+
+        assertThat(holdsOf(saleId)).isEqualTo(1);
+        assertThat(sales.availableTickets(saleId)).isEqualTo(98);
+    }
+
+    @Test
     void unknownSaleIsRejected() {
-        assertThatThrownBy(() -> holdService.hold(UUID.randomUUID(), "ana", 1))
+        assertThatThrownBy(() -> holdService.hold(UUID.randomUUID(), "ana", 1, UUID.randomUUID()))
                 .isInstanceOf(SaleNotFoundException.class);
     }
 
     @Test
     void expiredHoldReturnsTicketsAndActiveHoldStays() {
         UUID saleId = sales.open("Noite 1", 10, InventoryStrategy.ATOMIC);
-        Hold due = holdService.hold(saleId, "ana", 3);
+        Hold due = holdService.hold(saleId, "ana", 3, UUID.randomUUID());
         clock.advance(Duration.ofMinutes(5));
-        Hold active = holdService.hold(saleId, "bia", 2);
+        Hold active = holdService.hold(saleId, "bia", 2, UUID.randomUUID());
         clock.advance(Duration.ofMinutes(5));
 
         expireAllDue();
@@ -100,7 +133,7 @@ class HoldServiceIT {
     void concurrentExpirationReturnsEachHoldOnce() throws Exception {
         UUID saleId = sales.open("Noite 1", 400, InventoryStrategy.ATOMIC);
         for (int i = 0; i < 200; i++) {
-            holdService.hold(saleId, "comprador-" + i, 2);
+            holdService.hold(saleId, "comprador-" + i, 2, UUID.randomUUID());
         }
         clock.advance(HOLD_DURATION);
 
@@ -137,7 +170,7 @@ class HoldServiceIT {
 
     private boolean tryHold(UUID saleId) {
         try {
-            holdService.hold(saleId, "comprador", 1);
+            holdService.hold(saleId, "comprador", 1, UUID.randomUUID());
             return true;
         } catch (SoldOutException soldOut) {
             return false;

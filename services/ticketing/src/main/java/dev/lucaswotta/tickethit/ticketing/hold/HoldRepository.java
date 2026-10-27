@@ -26,15 +26,16 @@ class HoldRepository {
 
     // Devolve o que o banco gravou: o timestamptz guarda microssegundos, e o
     // Instant do Java pode ter nanossegundos.
-    Hold create(UUID saleId, String customerId, int quantity, Instant expiresAt) {
+    Hold create(UUID saleId, String customerId, int quantity, UUID passId, Instant expiresAt) {
         return jdbc.sql("""
-                        insert into hold (sale_id, customer_id, quantity, status, expires_at)
-                        values (:saleId, :customerId, :quantity, 'HELD', :expiresAt)
+                        insert into hold (sale_id, customer_id, quantity, pass_id, status, expires_at)
+                        values (:saleId, :customerId, :quantity, :passId, 'HELD', :expiresAt)
                         returning %s
                         """.formatted(COLUMNS))
                 .param("saleId", saleId)
                 .param("customerId", customerId)
                 .param("quantity", quantity)
+                .param("passId", passId)
                 .param("expiresAt", utc(expiresAt))
                 .query(HoldRepository::mapHold)
                 .single();
@@ -49,6 +50,14 @@ class HoldRepository {
                 .param("holdId", holdId)
                 .query(HoldRepository::mapHold)
                 .optional();
+    }
+
+    boolean passUsed(UUID saleId, UUID passId) {
+        return jdbc.sql("select exists (select 1 from hold where sale_id = :saleId and pass_id = :passId)")
+                .param("saleId", saleId)
+                .param("passId", passId)
+                .query(Boolean.class)
+                .single();
     }
 
     Optional<Hold> startPayment(UUID holdId, Instant now) {

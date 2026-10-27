@@ -18,6 +18,11 @@ server:
   port: 8082
 
 ticketing:
+  pass:
+    # Chave pública EC P-256 da queue, X.509 DER em base64. Com ela o ticketing
+    # confere o passe, mas não consegue emitir um.
+    public-key: ${QUEUE_PASS_PUBLIC_KEY:}
+    clock-skew: 5s
   hold:
     duration: 10m
     max-quantity: 4
