@@ -41,8 +41,12 @@ jobs:
             echo "$name=$(openssl rand -hex 24)"
           done > .env
       - run: docker compose up -d --wait --wait-timeout 300
-      # O --wait não espera containers de execução única; o wait devolve o código de saída.
-      - run: docker compose wait kafka-init
+      # O --wait não espera containers de execução única, e o compose wait do
+      # runner não acha container que já saiu. Espera o estado e exige saída 0.
+      - name: Esperar a criação dos tópicos
+        run: |
+          timeout 120 sh -c 'until [ "$(docker compose ps -a --format "{{.State}}" kafka-init)" = exited ]; do sleep 1; done'
+          test "$(docker compose ps -a --format "{{.ExitCode}}" kafka-init)" = 0
       - run: infra/smoke-test.sh
       - if: failure()
         run: docker compose logs
