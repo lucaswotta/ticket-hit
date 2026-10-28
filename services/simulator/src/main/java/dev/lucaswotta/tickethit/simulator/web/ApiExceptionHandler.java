@@ -25,12 +25,16 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         return problem(HttpStatus.UNPROCESSABLE_CONTENT, "TOO_MANY_BOTS", exception);
     }
 
-    // Retry-After de 30 s: uma sala dura em torno de um minuto depois da abertura.
+    // Retry-After e retryAfterSeconds com o fim estimado da sala em andamento:
+    // o site mostra quanto falta e tenta de novo sozinho.
     @ExceptionHandler(RoomsFullException.class)
     ResponseEntity<ProblemDetail> full(RoomsFullException exception) {
+        long seconds = Math.max(1, exception.retryAfter().toSeconds());
+        ProblemDetail problem = problem(HttpStatus.SERVICE_UNAVAILABLE, "ROOMS_FULL", exception);
+        problem.setProperty("retryAfterSeconds", seconds);
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                .header(HttpHeaders.RETRY_AFTER, "30")
-                .body(problem(HttpStatus.SERVICE_UNAVAILABLE, "ROOMS_FULL", exception));
+                .header(HttpHeaders.RETRY_AFTER, Long.toString(seconds))
+                .body(problem);
     }
 
     private static ProblemDetail problem(HttpStatus status, String code, RuntimeException exception) {

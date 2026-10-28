@@ -31,6 +31,9 @@ public class RoomService {
 
     private static final Logger log = LoggerFactory.getLogger(RoomService.class);
     private static final Duration KEEP_FINISHED = Duration.ofMinutes(30);
+    // Depois de todos liberados: reação, pagamento e confirmação dos últimos bots.
+    private static final Duration SETTLING = Duration.ofSeconds(15);
+    private static final Duration MIN_RETRY = Duration.ofSeconds(5);
 
     private final Map<UUID, Room> rooms = new ConcurrentHashMap<>();
     private final AtomicInteger running = new AtomicInteger();
@@ -55,7 +58,7 @@ public class RoomService {
         }
         if (running.incrementAndGet() > properties.maxRooms()) {
             running.decrementAndGet();
-            throw new RoomsFullException(properties.maxRooms());
+            throw new RoomsFullException(properties.maxRooms(), untilARoomEnds());
         }
         try {
             forgetOldRooms();
@@ -123,6 +126,24 @@ public class RoomService {
         room.finish(clock.instant());
         running.decrementAndGet();
         log.info("Sala {} encerrada: {}", room.id(), room.stats().outcomes());
+    }
+
+    // Fim estimado da sala que termina primeiro: abertura, tempo de liberar todos
+    // os bots e o tempo de assentar, nunca depois do prazo da sala.
+    private Duration untilARoomEnds() {
+        Instant now = clock.instant();
+        return rooms.values().stream()
+                .filter(room -> room.status() == Room.Status.RUNNING)
+                .map(room -> {
+                    RoomSettings settings = room.settings();
+                    long admitSeconds = (settings.bots() + settings.admissionsPerSecond() - 1) / settings.admissionsPerSecond();
+                    Instant estimated = room.opensAt().plusSeconds(admitSeconds).plus(SETTLING);
+                    Instant deadline = room.opensAt().plus(properties.roomTimeout());
+                    return Duration.between(now, estimated.isBefore(deadline) ? estimated : deadline);
+                })
+                .min(Duration::compareTo)
+                .filter(remaining -> remaining.compareTo(MIN_RETRY) > 0)
+                .orElse(MIN_RETRY);
     }
 
     private Duration reaction() {

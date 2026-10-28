@@ -25,7 +25,8 @@ server:
 simulator:
   # Os bots falam com o sistema pela mesma porta que um comprador real.
   gateway-url: ${GATEWAY_URL:http://localhost:8080}
-  max-rooms: 3
+  # Uma sala por vez: duas salas de 100 bots disputariam os 4 núcleos da VM.
+  max-rooms: 1
   max-bots: 100
   abusive-share: 0.05
   room-timeout: 3m
