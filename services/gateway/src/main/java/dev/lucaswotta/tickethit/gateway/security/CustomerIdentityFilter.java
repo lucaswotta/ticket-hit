@@ -18,6 +18,12 @@ class CustomerIdentityFilter implements GlobalFilter, Ordered {
 
     static final String CUSTOMER_ID = "X-Customer-Id";
 
+    /**
+     * O comprador resolvido, para os filtros seguintes. O X-Act-As sai da
+     * requisição aqui; quem resolvesse de novo veria só o token do simulator.
+     */
+    static final String CUSTOMER_ATTRIBUTE = CustomerIdentityFilter.class.getName() + ".customer";
+
     private final CustomerResolver customers;
     private final ProblemResponses problems;
 
@@ -44,6 +50,9 @@ class CustomerIdentityFilter implements GlobalFilter, Ordered {
     }
 
     private static ServerWebExchange withCustomer(ServerWebExchange exchange, String customer) {
+        if (customer != null) {
+            exchange.getAttributes().put(CUSTOMER_ATTRIBUTE, customer);
+        }
         return exchange.mutate()
                 .request(request -> request.headers(headers -> {
                     headers.remove(CUSTOMER_ID);

@@ -48,24 +48,31 @@ public class QueueService {
     public Entry entry(UUID saleId, String customerId) {
         QueueSettings settings = queues.settings(saleId).orElseThrow(() -> new QueueNotFoundException(saleId));
         Instant now = clock.instant();
-        var admittedAt = queues.admittedAt(saleId, customerId);
-        if (admittedAt.isPresent()) {
-            // Em segundos inteiros, como o exp do JWT: a API e o token informam o mesmo prazo.
-            Instant passExpiresAt = admittedAt.get().plus(properties.pass().ttl()).truncatedTo(ChronoUnit.SECONDS);
-            if (!now.isBefore(passExpiresAt)) {
-                return new Entry(EntryStatus.PASS_EXPIRED, settings.opensAt(), null, null, null, null, passExpiresAt);
-            }
-            String pass = passIssuer.issue(saleId, customerId, admittedAt.get(), passExpiresAt);
-            return new Entry(EntryStatus.ADMITTED, settings.opensAt(), null, null, null, pass, passExpiresAt);
+        // Posição antes de liberação: admit.lua tira da fila e marca como
+        // liberado no mesmo passo atômico. Na ordem inversa, quem fosse liberado
+        // entre as duas leituras não apareceria em nenhuma.
+        var rank = queues.rank(saleId, customerId);
+        if (rank.isPresent()) {
+            return waiting(settings, now, rank.get(), queues.waitingCount(saleId));
         }
-        long rank = queues.rank(saleId, customerId).orElseThrow(() -> new NotInQueueException(saleId, customerId));
-        long waiting = queues.waitingCount(saleId);
+        Instant admittedAt = queues.admittedAt(saleId, customerId)
+                .orElseThrow(() -> new NotInQueueException(saleId, customerId));
+        // Em segundos inteiros, como o exp do JWT: a API e o token informam o mesmo prazo.
+        Instant passExpiresAt = admittedAt.plus(properties.pass().ttl()).truncatedTo(ChronoUnit.SECONDS);
+        if (!now.isBefore(passExpiresAt)) {
+            return new Entry(EntryStatus.PASS_EXPIRED, settings.opensAt(), null, null, null, null, passExpiresAt);
+        }
+        String pass = passIssuer.issue(saleId, customerId, admittedAt, passExpiresAt);
+        return new Entry(EntryStatus.ADMITTED, settings.opensAt(), null, null, null, pass, passExpiresAt);
+    }
+
+    private static Entry waiting(QueueSettings settings, Instant now, long rank, long waiting) {
         // Antes do sorteio a posição não sai: a nota aleatória já existe, mas
         // revelá-la antecipadamente deixaria o comprador saber o resultado.
         if (now.isBefore(settings.opensAt())) {
             return new Entry(EntryStatus.WAITING_DRAW, settings.opensAt(), null, waiting, null, null, null);
         }
-        long estimatedWait = (rank + 1 + settings.admissionsPerSecond() - 1) / settings.admissionsPerSecond();
+        long estimatedWait = (rank + settings.admissionsPerSecond()) / settings.admissionsPerSecond();
         return new Entry(EntryStatus.WAITING, settings.opensAt(), rank + 1, waiting, estimatedWait, null, null);
     }
 

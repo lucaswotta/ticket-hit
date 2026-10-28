@@ -106,7 +106,7 @@ flowchart LR
 | `queue` | sala de espera, sorteio, posição, taxa de liberação, emissão do passe | Redis |
 | `ticketing` | estoque, hold, expiração, compra | PostgreSQL |
 | `payment` | pagamento falso que atrasa e falha de propósito e confirma por evento | PostgreSQL |
-| `simulator` | cria a sala da demo e conduz os bots pela API | nenhum |
+| `simulator` | cria a sala da demo e conduz os bots pelo `gateway` | memória |
 | `xray` | consome eventos de todos os serviços e entrega ao navegador por sala | nenhum |
 | `web` | site do festival e raio-x | nenhum |
 
@@ -195,11 +195,11 @@ Cada serviço publica eventos de telemetria marcados com o identificador da sala
 
 - Nome do festival e identidade visual.
 - Stack do `web`.
-- Proporção de bots abusivos e tipos de ataque simulados.
 - Texto da tela de resultado e tamanho do estoque da sala da demo.
 - Fonte do replay: log do Kafka ou buffer do `xray`.
 - Observabilidade: métricas e tracing.
 - Aviso de esgotado para quem ainda está na fila.
 - Estorno de pagamento aprovado depois que o hold expirou.
+- Número de bots por sala que a VM gratuita aguenta, medido nela, e sala de aquecimento depois do deploy.
 
-Decididos: Java 25, Spring Boot 4.1 e Maven; sorteio, liberação e passe na ADR 0007; limite de 4 ingressos por hold e um hold por passe.
+Decididos: Java 25, Spring Boot 4.1 e Maven; sorteio, liberação e passe na ADR 0007; limite de 4 ingressos por hold e um hold por passe; bots e ataques na ADR 0009.

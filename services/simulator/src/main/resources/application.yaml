@@ -1,0 +1,39 @@
+spring:
+  application:
+    name: simulator
+  threads:
+    virtual:
+      enabled: true
+  mvc:
+    problemdetails:
+      enabled: true
+  security:
+    oauth2:
+      client:
+        registration:
+          keycloak:
+            client-id: simulator
+            client-secret: ${KEYCLOAK_SIMULATOR_SECRET:}
+            authorization-grant-type: client_credentials
+        provider:
+          keycloak:
+            token-uri: ${KEYCLOAK_TOKEN_URI:http://localhost:8180/realms/ticket-hit/protocol/openid-connect/token}
+
+server:
+  port: 8085
+
+simulator:
+  # Os bots falam com o sistema pela mesma porta que um comprador real.
+  gateway-url: ${GATEWAY_URL:http://localhost:8080}
+  max-rooms: 3
+  max-bots: 1000
+  abusive-share: 0.05
+  room-timeout: 3m
+  defaults:
+    tickets: 500
+    bots: 1000
+    admissions-per-second: 50
+    lobby: 10s
+  reaction:
+    min: 200ms
+    max: 1500ms

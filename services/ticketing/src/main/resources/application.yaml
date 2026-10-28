@@ -30,7 +30,14 @@ ticketing:
     expiration-interval: 1s
   payment:
     base-url: ${PAYMENT_BASE_URL:http://localhost:8083}
+    # O pior caso precisa caber no response-timeout do gateway (5 s): três
+    # tentativas de 1 s mais os backoffs de 200 e 400 ms dão 3,6 s.
     connect-timeout: 1s
-    read-timeout: 2s
-    max-retries: 3
+    read-timeout: 1s
+    max-retries: 2
     retry-delay: 200ms
+  naive:
+    # Intervalo entre ler e gravar no modo ingênuo, no lugar do trabalho que
+    # código real faz ali (preço, regras, chamadas). É essa janela que abre a
+    # corrida que a demo mostra; ver docs/adr/0001-estrategia-de-estoque.md.
+    read-write-gap: 20ms
