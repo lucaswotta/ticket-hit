@@ -10,7 +10,7 @@ Na abertura da venda, centenas de requisições tentam tirar ingresso do mesmo s
 
 - A retirada de estoque fica atrás da interface `TicketInventory`, com duas implementações. Cada venda guarda em `sale.inventory_strategy` qual delas usa.
 - `AtomicTicketInventory` faz um `UPDATE` condicional (`where available_tickets >= :quantity`). O PostgreSQL confere e subtrai na mesma instrução, com a linha travada.
-- `NaiveTicketInventory` faz `SELECT`, confere em Java, espera `ticketing.naive.read-write-gap` (20 ms) e faz `UPDATE` relativo. Existe só para a demo. A espera ocupa o lugar do trabalho que código real faz entre ler e gravar; sem ela, a fila espalha os compradores o bastante para a janela de microssegundos quase nunca ser atingida.
+- `NaiveTicketInventory` faz `SELECT`, confere em Java, espera `ticketing.naive.read-write-gap` (60 ms) e faz `UPDATE` relativo. Existe só para a demo. A espera ocupa o lugar do trabalho que código real faz entre ler e gravar; sem ela, os compradores chegam espaçados o bastante para a janela de microssegundos quase nunca ser atingida. Com 100 bots e 50 ingressos, 20 ms venderam a mais em 4 de 5 salas e 60 ms em 8 de 8 (de 1 a 7 ingressos a mais).
 - A constraint `available_tickets_within_total` impede estoque negativo ou acima do total em toda venda que não seja `NAIVE`. É a segunda barreira, caso algum código futuro escape da primeira.
 
 ## Alternativas

@@ -4,7 +4,7 @@ Status: aceita
 
 ## Contexto
 
-O comprador precisa vir de uma conta, para valer "um lugar por pessoa", e não do corpo da requisição. A demo tem cerca de 1.000 bots por sala, cada um com identidade própria. Um login no Keycloak por bot significaria 1.000 cálculos de hash de senha por sala, caros de propósito, numa VM gratuita.
+O comprador precisa vir de uma conta, para valer "um lugar por pessoa", e não do corpo da requisição. A demo tem até 100 bots por sala, cada um com identidade própria, e várias salas por hora. Um login no Keycloak por bot significaria um cálculo de hash de senha, caro de propósito, para cada bot de cada sala, numa VM gratuita.
 
 ## Decisão
 
