@@ -36,3 +36,8 @@ ticketing:
     read-timeout: 1s
     max-retries: 2
     retry-delay: 200ms
+  naive:
+    # Intervalo entre ler e gravar no modo ingênuo, no lugar do trabalho que
+    # código real faz ali (preço, regras, chamadas). É essa janela que abre a
+    # corrida que a demo mostra; ver docs/adr/0001-estrategia-de-estoque.md.
+    read-write-gap: 20ms
