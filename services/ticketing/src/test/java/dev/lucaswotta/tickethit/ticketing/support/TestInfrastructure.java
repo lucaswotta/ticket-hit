@@ -31,6 +31,11 @@ class TestInfrastructure {
     }
 
     @Bean
+    NewTopic telemetryEvents() {
+        return TopicBuilder.name("telemetry-events").partitions(3).replicas(1).build();
+    }
+
+    @Bean
     NewTopic paymentEventsDeadLetter() {
         return TopicBuilder.name("payment-events-dlt").partitions(3).replicas(1).build();
     }

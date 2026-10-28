@@ -1,6 +1,7 @@
 package dev.lucaswotta.tickethit.ticketing.sale;
 
 import java.time.Duration;
+import java.util.OptionalInt;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -28,20 +29,26 @@ class NaiveTicketInventory implements TicketInventory {
     }
 
     @Override
-    public boolean tryWithdraw(UUID saleId, int quantity) {
+    public OptionalInt tryWithdraw(UUID saleId, int quantity) {
         int available = jdbc.sql("select available_tickets from sale where id = :saleId")
                 .param("saleId", saleId)
                 .query(Integer.class)
                 .single();
         if (available < quantity) {
-            return false;
+            return OptionalInt.empty();
         }
         pause();
-        jdbc.sql("update sale set available_tickets = available_tickets - :quantity where id = :saleId")
+        int remaining = jdbc.sql("""
+                        update sale
+                           set available_tickets = available_tickets - :quantity
+                         where id = :saleId
+                     returning available_tickets
+                        """)
                 .param("saleId", saleId)
                 .param("quantity", quantity)
-                .update();
-        return true;
+                .query(Integer.class)
+                .single();
+        return OptionalInt.of(remaining);
     }
 
     private void pause() {

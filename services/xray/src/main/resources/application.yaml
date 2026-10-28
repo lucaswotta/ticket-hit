@@ -1,0 +1,24 @@
+spring:
+  application:
+    name: xray
+  threads:
+    virtual:
+      enabled: true
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      # Só eventos novos: o histórico de cada sala vem da memória do xray.
+      auto-offset-reset: latest
+  mvc:
+    problemdetails:
+      enabled: true
+
+server:
+  port: 8084
+
+xray:
+  backlog-size: 2000
+  max-streams-per-sale: 10
+  stream-timeout: 10m
+  idle-feed-ttl: 30m
+  heartbeat-interval: 15s

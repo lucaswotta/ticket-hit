@@ -10,3 +10,4 @@ create_topic() {
 
 create_topic payment-events 3
 create_topic payment-events-dlt 3
+create_topic telemetry-events 3

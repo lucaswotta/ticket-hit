@@ -1,6 +1,7 @@
 package dev.lucaswotta.tickethit.gateway;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 import static org.springframework.security.test.web.reactive.server.SecurityMockServerConfigurers.mockJwt;
 
 import com.sun.net.httpserver.Headers;
@@ -9,6 +10,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -17,6 +19,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.kafka.autoconfigure.KafkaConnectionDetails;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTestClient;
 import org.springframework.context.annotation.Import;
@@ -44,12 +47,16 @@ class GatewayIT {
     @Autowired
     WebTestClient client;
 
+    @Autowired
+    KafkaConnectionDetails kafka;
+
     @DynamicPropertySource
     static void routesToUpstream(DynamicPropertyRegistry registry) {
         String url = "http://127.0.0.1:" + upstream.getAddress().getPort();
         registry.add("QUEUE_URI", () -> url);
         registry.add("TICKETING_URI", () -> url);
         registry.add("SIMULATOR_URI", () -> url);
+        registry.add("XRAY_URI", () -> url);
     }
 
     @AfterAll
@@ -171,6 +178,16 @@ class GatewayIT {
     }
 
     @Test
+    void xrayNeedsALoggedVisitor() {
+        client.get().uri("/api/xray/{id}/events", UUID.randomUUID()).exchange().expectStatus().isUnauthorized();
+
+        client.mutateWith(user("ana")).get().uri("/api/xray/{id}/events", UUID.randomUUID()).exchange()
+                .expectStatus().isOk();
+
+        assertThat(lastRequest.get().path()).startsWith("/api/xray/");
+    }
+
+    @Test
     void paymentServiceIsNotExposed() {
         client.mutateWith(user("ana")).post().uri("/api/charges").exchange().expectStatus().isNotFound();
         client.get().uri("/actuator/health").exchange().expectStatus().isUnauthorized();
@@ -197,6 +214,22 @@ class GatewayIT {
                 .exchange()
                 .expectStatus()
                 .isOk();
+    }
+
+    @Test
+    void blockedRequestsShowUpInTelemetry() {
+        UUID saleId = UUID.randomUUID();
+        for (int i = 0; i < 4; i++) {
+            client.mutateWith(simulator()).get().uri("/api/queues/{id}/entries/me", saleId)
+                    .header("X-Act-As", "bot-77").exchange();
+        }
+        client.mutateWith(user("ana")).post().uri("/api/queues/{id}/entries", saleId)
+                .header("X-Act-As", "bot-1").exchange();
+
+        await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> assertThat(
+                        TelemetryReader.eventsOf(kafka.getBootstrapServers(), saleId))
+                .extracting(event -> event.get("type").asString())
+                .containsExactlyInAnyOrder("RATE_LIMITED", "ACT_AS_FORBIDDEN"));
     }
 
     // Todos os bots usam o mesmo token do simulator; o balde precisa ser do bot.

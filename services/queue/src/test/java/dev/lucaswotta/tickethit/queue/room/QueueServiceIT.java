@@ -2,6 +2,7 @@ package dev.lucaswotta.tickethit.queue.room;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.awaitility.Awaitility.await;
 
 import com.nimbusds.jose.jwk.Curve;
 import com.nimbusds.jose.jwk.ECKey;
@@ -9,6 +10,7 @@ import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import dev.lucaswotta.tickethit.queue.support.IntegrationTest;
 import dev.lucaswotta.tickethit.queue.support.MutableClock;
+import dev.lucaswotta.tickethit.queue.support.TelemetryReader;
 import dev.lucaswotta.tickethit.queue.support.TestPassKeys;
 import java.security.KeyFactory;
 import java.security.interfaces.ECPublicKey;
@@ -27,6 +29,7 @@ import java.util.concurrent.Future;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.kafka.autoconfigure.KafkaConnectionDetails;
 import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtTimestampValidator;
@@ -42,6 +45,9 @@ class QueueServiceIT {
 
     @Autowired
     MutableClock clock;
+
+    @Autowired
+    KafkaConnectionDetails kafka;
 
     @Test
     void positionIsHiddenUntilTheDraw() {
@@ -213,6 +219,19 @@ class QueueServiceIT {
         assertThat(pass.getAudience()).containsExactly("ticketing");
         assertThat(pass.getExpiresAt()).isEqualTo(entry.passExpiresAt());
         assertThat(decoder().decode(queueService.entry(saleId, "ana").pass()).getId()).isEqualTo(pass.getId());
+    }
+
+    @Test
+    void joinAndAdmissionShowUpInTelemetry() {
+        UUID saleId = newQueue(10);
+        queueService.join(saleId, "bot-1");
+        clock.advance(UNTIL_OPENING.plusSeconds(1));
+        queueService.admitDue();
+
+        await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> assertThat(
+                        TelemetryReader.eventsOf(kafka.getBootstrapServers(), saleId))
+                .extracting(event -> event.get("type").asString() + ":" + event.get("customerId").asString())
+                .containsExactly("QUEUE_JOINED:bot-1", "QUEUE_ADMITTED:bot-1"));
     }
 
     @Test

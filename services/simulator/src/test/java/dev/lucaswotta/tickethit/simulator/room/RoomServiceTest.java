@@ -42,7 +42,9 @@ class RoomServiceTest {
         Room first = rooms.create("ana", HUNDRED_BOTS_FIFTY_TICKETS);
 
         assertThatThrownBy(() -> rooms.create("bia", HUNDRED_BOTS_FIFTY_TICKETS))
-                .isInstanceOf(RoomsFullException.class);
+                .isInstanceOfSatisfying(RoomsFullException.class, full ->
+                        // 100 bots a 50/s levam 2 s para sair da fila, mais 15 s para assentar.
+                        assertThat(full.retryAfter()).isBetween(Duration.ofSeconds(15), Duration.ofSeconds(17)));
 
         release.countDown();
         await().atMost(Duration.ofSeconds(20)).until(() -> first.status() == Room.Status.FINISHED);

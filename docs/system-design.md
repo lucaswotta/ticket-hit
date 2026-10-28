@@ -14,11 +14,11 @@ O visitante vê duas metades da mesma tela:
 Fluxo da visita:
 
 1. O visitante clica no banner do artista e entra na sala de espera de um show criado só para ele.
-2. Cerca de 1.000 bots entram na mesma sala. Os bots fazem requisições reais à mesma API que o visitante usa.
+2. Cerca de 100 bots entram na mesma sala. Os bots fazem requisições reais à mesma API que o visitante usa.
 3. Na abertura, o sorteio define a posição de cada um e a fila começa a andar, com o relógio da demo acelerado.
 4. Quando o visitante é liberado, o formulário de compra se preenche sozinho com dados fictícios e o botão "Comprar" é habilitado.
 5. Se ele clicar antes de o estoque acabar, compra. Se demorar, vê "esgotado".
-6. O resultado compara o visitante com os bots: a ordem da compra dele ("você levou o ingresso 442 de 500"), o tempo entre o botão habilitado e o clique, e o tempo médio dos bots. Quem perdeu vê quanto tempo faltou.
+6. O resultado compara o visitante com os bots: a ordem da compra dele ("você levou o ingresso 42 de 50"), o tempo entre o botão habilitado e o clique, e o tempo médio dos bots. Quem perdeu vê quanto tempo faltou.
 7. No fim, um replay mostra a linha do tempo do que aconteceu no backend.
 
 A ordem da compra e os tempos são medidos no servidor, a partir do hold e do pedido de compra, e não pelo relógio do navegador.
@@ -27,7 +27,7 @@ Regras da demonstração:
 
 - Um aviso discreto e permanente informa que é uma simulação e que nada é cobrado. Como o formulário se preenche sozinho, ninguém digita dado pessoal ou cartão real.
 - O raio-x mostra eventos emitidos de fato pelos serviços. Há dois modos alternáveis: narrado (eventos exibidos com atraso e legenda) e bruto (tempo real). O modo inicial é o narrado.
-- Cada visitante tem uma sala privada. Quando a máquina atinge o limite de salas simultâneas, o visitante seguinte espera numa fila de entrada da própria demo.
+- Cada visitante tem uma sala privada, e roda uma sala por vez. Quem chega com a sala ocupada recebe o tempo estimado até ela terminar e o site tenta de novo sozinho.
 - No celular, o site ocupa a tela e o raio-x fica numa gaveta inferior com posição na fila, estoque, bots ativos e o último evento. Arrastar a gaveta para cima abre o raio-x completo.
 
 Controles do raio-x:
@@ -169,7 +169,7 @@ sequenceDiagram
 
 ## Raio-x
 
-Cada serviço publica eventos de telemetria marcados com o identificador da sala e da requisição. O `xray` consome esses eventos, filtra por sala e envia ao navegador por Server-Sent Events. No modo narrado, o navegador segura os eventos num buffer e os exibe com atraso e legenda; no modo bruto, exibe à medida que chegam.
+`queue`, `ticketing` e `gateway` publicam eventos de telemetria no tópico `telemetry-events`, com a venda como chave (contrato em `docs/eventos.md`). O `xray` guarda os últimos eventos de cada venda e os envia ao navegador por Server-Sent Events em `/api/xray/{saleId}/events`: primeiro o histórico, depois ao vivo. No modo narrado, o navegador segura os eventos num buffer e os exibe com atraso e legenda; no modo bruto, exibe à medida que chegam. Ver ADR 0010.
 
 ## Infraestrutura
 

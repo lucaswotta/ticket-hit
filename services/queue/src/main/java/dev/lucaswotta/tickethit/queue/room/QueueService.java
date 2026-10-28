@@ -2,11 +2,13 @@ package dev.lucaswotta.tickethit.queue.room;
 
 import dev.lucaswotta.tickethit.queue.QueueProperties;
 import dev.lucaswotta.tickethit.queue.pass.PassIssuer;
+import dev.lucaswotta.tickethit.queue.telemetry.Telemetry;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 
@@ -20,12 +22,15 @@ public class QueueService {
     private final QueueRepository queues;
     private final PassIssuer passIssuer;
     private final QueueProperties properties;
+    private final Telemetry telemetry;
     private final Clock clock;
 
-    QueueService(QueueRepository queues, PassIssuer passIssuer, QueueProperties properties, Clock clock) {
+    QueueService(
+            QueueRepository queues, PassIssuer passIssuer, QueueProperties properties, Telemetry telemetry, Clock clock) {
         this.queues = queues;
         this.passIssuer = passIssuer;
         this.properties = properties;
+        this.telemetry = telemetry;
         this.clock = clock;
     }
 
@@ -41,6 +46,9 @@ public class QueueService {
         long result = queues.join(saleId, customerId, clock.instant(), lottery.nextDouble());
         if (result == -1) {
             throw new QueueNotFoundException(saleId);
+        }
+        if (result == 1) {
+            telemetry.publish(saleId, "QUEUE_JOINED", customerId, Map.of());
         }
         return result == 1;
     }
@@ -97,6 +105,7 @@ public class QueueService {
                 continue;
             }
             List<String> released = queues.admit(saleId, now);
+            released.forEach(customer -> telemetry.publish(saleId, "QUEUE_ADMITTED", customer, Map.of()));
             admitted += released.size();
         }
         return admitted;

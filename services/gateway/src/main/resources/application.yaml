@@ -1,6 +1,8 @@
 spring:
   application:
     name: gateway
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -64,6 +66,19 @@ spring:
               uri: ${QUEUE_URI:http://localhost:8081}
               predicates:
                 - Path=/api/queues/**
+              filters:
+                - name: RequestRateLimiter
+                  args:
+                    key-resolver: "#{@customerKeyResolver}"
+                    redis-rate-limiter.replenishRate: ${gateway.rate-limit.customer.per-second}
+                    redis-rate-limiter.burstCapacity: ${gateway.rate-limit.customer.burst}
+            - id: xray
+              uri: ${XRAY_URI:http://localhost:8084}
+              predicates:
+                - Path=/api/xray/**
+              # O raio-x é um stream SSE que fica aberto: sem timeout de resposta.
+              metadata:
+                response-timeout: -1
               filters:
                 - name: RequestRateLimiter
                   args:

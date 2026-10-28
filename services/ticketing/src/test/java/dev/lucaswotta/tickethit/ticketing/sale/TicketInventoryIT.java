@@ -87,7 +87,7 @@ class TicketInventoryIT {
             for (int i = 0; i < BUYERS; i++) {
                 attempts.add(executor.submit(() -> {
                     start.await();
-                    return inventory.tryWithdraw(saleId, 1);
+                    return inventory.tryWithdraw(saleId, 1).isPresent();
                 }));
             }
             start.countDown();
