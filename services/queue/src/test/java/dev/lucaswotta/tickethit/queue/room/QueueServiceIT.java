@@ -154,6 +154,49 @@ class QueueServiceIT {
         assertThat(queueService.stats(saleId).admitted()).isEqualTo(10);
     }
 
+    // Consultas da própria posição enquanto a liberação roda, como os bots fazem.
+    // Quem está saindo da fila precisa aparecer como esperando ou liberado,
+    // nunca como fora da fila.
+    @Test
+    void buyerIsNeverMissingWhileBeingAdmitted() throws Exception {
+        UUID saleId = newQueue(1_000);
+        List<String> buyers = IntStream.range(0, 300).mapToObj(i -> "c" + i).toList();
+        buyers.forEach(customer -> queueService.join(saleId, customer));
+        clock.advance(UNTIL_OPENING);
+
+        var missing = new java.util.concurrent.atomic.AtomicInteger();
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var admissions = executor.submit(() -> {
+                for (int i = 0; i < 300; i++) {
+                    clock.advance(Duration.ofMillis(1));
+                    queueService.admitDue();
+                }
+                return null;
+            });
+            List<Future<?>> readers = new ArrayList<>();
+            for (int reader = 0; reader < 8; reader++) {
+                readers.add(executor.submit(() -> {
+                    while (!admissions.isDone()) {
+                        for (String customer : buyers) {
+                            try {
+                                queueService.entry(saleId, customer);
+                            } catch (NotInQueueException e) {
+                                missing.incrementAndGet();
+                            }
+                        }
+                    }
+                    return null;
+                }));
+            }
+            admissions.get();
+            for (Future<?> reader : readers) {
+                reader.get();
+            }
+        }
+
+        assertThat(missing).hasValue(0);
+    }
+
     @Test
     void admittedBuyerGetsAPassSignedForTicketing() throws Exception {
         UUID saleId = newQueue(10);
