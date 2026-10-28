@@ -117,25 +117,29 @@ class HoldRepository {
                 .optional();
     }
 
-    /** Libera o hold e devolve os ingressos ao estoque. Devolve false se não havia o que liberar. */
-    boolean release(UUID holdId) {
-        int returned = jdbc.sql("""
+    /** Libera o hold, devolve os ingressos e informa o estoque resultante; vazio se não havia o que liberar. */
+    Optional<Released> release(UUID holdId) {
+        return jdbc.sql("""
                         with released as (
                             update hold
                                set status = 'RELEASED'
                              where id = :holdId
                                and status in ('HELD', 'PAYING')
-                         returning sale_id, quantity
+                         returning sale_id, customer_id, quantity
                         )
                         update sale
                            set available_tickets = available_tickets + released.quantity
                           from released
                          where sale.id = released.sale_id
+                     returning sale.id, released.customer_id, sale.available_tickets
                         """)
                 .param("holdId", holdId)
-                .update();
-        return returned == 1;
+                .query((rs, row) -> new Released(
+                        rs.getObject("id", UUID.class), rs.getString("customer_id"), rs.getInt("available_tickets")))
+                .optional();
     }
+
+    record Released(UUID saleId, String customerId, int availableTickets) {}
 
     /**
      * Expira até {@code batchSize} holds vencidos e devolve os ingressos ao estoque,

@@ -2,11 +2,17 @@ package dev.lucaswotta.tickethit.ticketing.web;
 
 import dev.lucaswotta.tickethit.ticketing.hold.Hold;
 import dev.lucaswotta.tickethit.ticketing.hold.HoldService;
+import dev.lucaswotta.tickethit.ticketing.hold.InvalidQuantityException;
+import dev.lucaswotta.tickethit.ticketing.hold.PassAlreadyUsedException;
+import dev.lucaswotta.tickethit.ticketing.hold.SoldOutException;
+import dev.lucaswotta.tickethit.ticketing.pass.InvalidPassException;
 import dev.lucaswotta.tickethit.ticketing.pass.PassVerifier;
 import dev.lucaswotta.tickethit.ticketing.sale.Sale;
 import dev.lucaswotta.tickethit.ticketing.sale.SaleNotFoundException;
 import dev.lucaswotta.tickethit.ticketing.sale.SaleRepository;
+import dev.lucaswotta.tickethit.ticketing.telemetry.Telemetry;
 import jakarta.validation.Valid;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,11 +32,13 @@ class SaleController {
     private final SaleRepository sales;
     private final HoldService holdService;
     private final PassVerifier passVerifier;
+    private final Telemetry telemetry;
 
-    SaleController(SaleRepository sales, HoldService holdService, PassVerifier passVerifier) {
+    SaleController(SaleRepository sales, HoldService holdService, PassVerifier passVerifier, Telemetry telemetry) {
         this.sales = sales;
         this.holdService = holdService;
         this.passVerifier = passVerifier;
+        this.telemetry = telemetry;
     }
 
     @PostMapping("/api/sales")
@@ -54,8 +62,14 @@ class SaleController {
             @RequestHeader("Queue-Pass") String pass,
             @Valid @RequestBody HoldRequest request,
             UriComponentsBuilder uri) {
-        UUID passId = passVerifier.verify(pass, saleId, customerId);
-        Hold hold = holdService.hold(saleId, customerId, request.quantity(), passId);
+        Hold hold;
+        try {
+            UUID passId = passVerifier.verify(pass, saleId, customerId);
+            hold = holdService.hold(saleId, customerId, request.quantity(), passId);
+        } catch (InvalidPassException | PassAlreadyUsedException | SoldOutException | InvalidQuantityException rejected) {
+            telemetry.publish(saleId, "HOLD_REJECTED", customerId, Map.of("code", rejectionCode(rejected)));
+            throw rejected;
+        }
         return ResponseEntity.created(uri.path("/api/holds/{id}").build(hold.id())).body(hold);
     }
 
@@ -63,6 +77,16 @@ class SaleController {
     @PostMapping("/api/holds/{holdId}/payment")
     ResponseEntity<Hold> pay(@PathVariable UUID holdId, @RequestHeader(CUSTOMER_ID) String customerId) {
         return ResponseEntity.accepted().body(holdService.pay(holdId, customerId));
+    }
+
+    // Os mesmos códigos que o ApiExceptionHandler devolve ao cliente.
+    private static String rejectionCode(RuntimeException rejected) {
+        return switch (rejected) {
+            case InvalidPassException invalid -> "INVALID_PASS";
+            case PassAlreadyUsedException used -> "PASS_ALREADY_USED";
+            case SoldOutException soldOut -> "SOLD_OUT";
+            default -> "INVALID_QUANTITY";
+        };
     }
 
     @GetMapping("/api/holds/{holdId}")

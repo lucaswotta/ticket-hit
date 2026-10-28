@@ -7,9 +7,11 @@ import dev.lucaswotta.tickethit.ticketing.sale.Sale;
 import dev.lucaswotta.tickethit.ticketing.sale.SaleNotFoundException;
 import dev.lucaswotta.tickethit.ticketing.sale.SaleRepository;
 import dev.lucaswotta.tickethit.ticketing.sale.TicketInventory;
+import dev.lucaswotta.tickethit.ticketing.telemetry.Telemetry;
 import java.time.Clock;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalInt;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -29,6 +31,7 @@ public class HoldService {
     private final Map<InventoryStrategy, TicketInventory> inventories;
     private final HoldProperties properties;
     private final PaymentClient paymentClient;
+    private final Telemetry telemetry;
     private final Clock clock;
 
     HoldService(
@@ -37,6 +40,7 @@ public class HoldService {
             List<TicketInventory> inventories,
             HoldProperties properties,
             PaymentClient paymentClient,
+            Telemetry telemetry,
             Clock clock) {
         this.sales = sales;
         this.holds = holds;
@@ -44,6 +48,7 @@ public class HoldService {
                 inventories.stream().collect(Collectors.toMap(TicketInventory::strategy, Function.identity()));
         this.properties = properties;
         this.paymentClient = paymentClient;
+        this.telemetry = telemetry;
         this.clock = clock;
     }
 
@@ -58,14 +63,19 @@ public class HoldService {
         if (holds.passUsed(saleId, passId)) {
             throw new PassAlreadyUsedException(saleId);
         }
-        if (!inventories.get(sale.inventoryStrategy()).tryWithdraw(saleId, quantity)) {
+        OptionalInt remaining = inventories.get(sale.inventoryStrategy()).tryWithdraw(saleId, quantity);
+        if (remaining.isEmpty()) {
             throw new SoldOutException(saleId, quantity);
         }
+        Hold hold;
         try {
-            return holds.create(saleId, customerId, quantity, passId, clock.instant().plus(properties.duration()));
+            hold = holds.create(saleId, customerId, quantity, passId, clock.instant().plus(properties.duration()));
         } catch (DuplicateKeyException concurrentUseOfThePass) {
             throw new PassAlreadyUsedException(saleId);
         }
+        telemetry.publishAfterCommit(saleId, "HOLD_CREATED", customerId,
+                Map.of("holdId", hold.id().toString(), "quantity", quantity, "available", remaining.getAsInt()));
+        return hold;
     }
 
     public Hold find(UUID holdId) {
@@ -95,14 +105,19 @@ public class HoldService {
             paymentClient.charge(paying.id(), paying.customerId());
         } catch (PaymentUnavailableException unavailable) {
             holds.revertPayment(holdId);
+            telemetry.publish(paying.saleId(), "PAYMENT_UNAVAILABLE", customerId, Map.of("holdId", holdId.toString()));
             throw unavailable;
         }
+        telemetry.publish(paying.saleId(), "PAYMENT_REQUESTED", customerId, Map.of("holdId", holdId.toString()));
         return paying;
     }
 
     @Transactional
     public void confirm(UUID holdId) {
-        if (holds.confirm(holdId, clock.instant()).isEmpty()) {
+        var confirmed = holds.confirm(holdId, clock.instant());
+        confirmed.ifPresent(hold -> telemetry.publishAfterCommit(hold.saleId(), "HOLD_CONFIRMED", hold.customerId(),
+                Map.of("holdId", hold.id().toString(), "ticket", hold.lastTicketNumber())));
+        if (confirmed.isEmpty()) {
             HoldStatus status = find(holdId).status();
             if (status != HoldStatus.CONFIRMED) {
                 log.warn("Pagamento aprovado para o hold {} em {}: ingresso não emitido, estorno necessário", holdId, status);
@@ -112,7 +127,8 @@ public class HoldService {
 
     @Transactional
     public void release(UUID holdId) {
-        holds.release(holdId);
+        holds.release(holdId).ifPresent(released -> telemetry.publishAfterCommit(released.saleId(), "HOLD_RELEASED",
+                released.customerId(), Map.of("holdId", holdId.toString(), "available", released.availableTickets())));
     }
 
     @Transactional

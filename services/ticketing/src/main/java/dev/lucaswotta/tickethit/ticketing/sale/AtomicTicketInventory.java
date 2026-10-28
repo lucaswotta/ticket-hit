@@ -1,5 +1,6 @@
 package dev.lucaswotta.tickethit.ticketing.sale;
 
+import java.util.OptionalInt;
 import java.util.UUID;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
@@ -21,16 +22,19 @@ class AtomicTicketInventory implements TicketInventory {
     // Conferir e subtrair numa instrução só: o PostgreSQL trava a linha durante
     // o UPDATE, então não existe intervalo entre ler o saldo e gravar o novo.
     @Override
-    public boolean tryWithdraw(UUID saleId, int quantity) {
-        int updated = jdbc.sql("""
+    public OptionalInt tryWithdraw(UUID saleId, int quantity) {
+        return jdbc.sql("""
                         update sale
                            set available_tickets = available_tickets - :quantity
                          where id = :saleId
                            and available_tickets >= :quantity
+                     returning available_tickets
                         """)
                 .param("saleId", saleId)
                 .param("quantity", quantity)
-                .update();
-        return updated == 1;
+                .query(Integer.class)
+                .optional()
+                .map(OptionalInt::of)
+                .orElse(OptionalInt.empty());
     }
 }
