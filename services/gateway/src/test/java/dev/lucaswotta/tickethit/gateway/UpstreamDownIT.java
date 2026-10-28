@@ -8,7 +8,12 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 // A porta 1 não tem ninguém escutando: a conexão é recusada na hora.
-@SpringBootTest(properties = {"QUEUE_URI=http://127.0.0.1:1", "TICKETING_URI=http://127.0.0.1:1"})
+@SpringBootTest(
+        properties = {
+            "QUEUE_URI=http://127.0.0.1:1",
+            "TICKETING_URI=http://127.0.0.1:1",
+            "SIMULATOR_URI=http://127.0.0.1:1"
+        })
 @AutoConfigureWebTestClient
 @Import(TestRedis.class)
 class UpstreamDownIT {

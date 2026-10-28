@@ -15,10 +15,9 @@ class RateLimitKeys {
     // @Primary só escolhe o padrão do gateway; toda rota declara o seu resolver.
     @Bean
     @Primary
-    KeyResolver customerKeyResolver(CustomerResolver customers) {
-        return exchange -> customers.resolve(exchange)
-                .map(customer -> "customer:" + customer)
-                .onErrorResume(ActAsForbiddenException.class, forbidden -> Mono.empty());
+    KeyResolver customerKeyResolver() {
+        return exchange -> Mono.justOrEmpty(exchange.<String>getAttribute(CustomerIdentityFilter.CUSTOMER_ATTRIBUTE))
+                .map(customer -> "customer:" + customer);
     }
 
     // Sem endereço remoto, todas as requisições dividem um balde só: o limite

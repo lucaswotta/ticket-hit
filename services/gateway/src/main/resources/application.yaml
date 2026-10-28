@@ -22,6 +22,20 @@ spring:
           httpclient:
             connect-timeout: 1000
             response-timeout: 5s
+            pool:
+              # Abaixo do keep-alive dos serviços: a conexão ociosa sai do pool
+              # antes de o servidor fechá-la do outro lado.
+              max-idle-time: 10s
+          # GET é idempotente: se a conexão falhar antes da resposta, tenta uma
+          # vez de novo. Status de resposta não entra (series vazia), para um 503
+          # do serviço não virar duas chamadas.
+          default-filters:
+            - name: Retry
+              args:
+                retries: 1
+                methods: GET
+                series:
+                exceptions: java.io.IOException
           # O payment não tem rota: só o ticketing fala com ele, pela rede interna.
           routes:
             - id: sales-public
@@ -50,6 +64,16 @@ spring:
               uri: ${QUEUE_URI:http://localhost:8081}
               predicates:
                 - Path=/api/queues/**
+              filters:
+                - name: RequestRateLimiter
+                  args:
+                    key-resolver: "#{@customerKeyResolver}"
+                    redis-rate-limiter.replenishRate: ${gateway.rate-limit.customer.per-second}
+                    redis-rate-limiter.burstCapacity: ${gateway.rate-limit.customer.burst}
+            - id: simulator
+              uri: ${SIMULATOR_URI:http://localhost:8085}
+              predicates:
+                - Path=/api/rooms/**
               filters:
                 - name: RequestRateLimiter
                   args:
