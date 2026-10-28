@@ -12,7 +12,7 @@ A demo precisa de compradores disputando o estoque com o visitante, além de bot
 - Comprador comum (`BuyerBot`): entra na fila durante o lobby, consulta a posição a cada metade do tempo estimado (entre 0,5 s e 5 s), espera um tempo de reação de 200 a 1.500 ms, segura 1 ingresso, paga e acompanha o hold. 429 faz esperar 1 s e tentar de novo; 503 no pagamento faz tentar de novo; 504 faz consultar o hold antes de pagar outra vez.
 - Bots abusivos, 5% da sala, em quatro ataques: passe forjado, passe de outro bot, hold sem passe e rajada de 30 consultas em paralelo. Cada um tem uma resposta esperada (403, 403, 400, 429). Sem ela, o resultado é `ATTACK_SUCCEEDED`.
 - Modo sem proteção: estoque ingênuo e fila liberando 1.000 por segundo. Com a fila no ritmo normal, ela sozinha protege o estoque e a falha não aparece.
-- Até 3 salas ao mesmo tempo; acima disso, 503 `ROOMS_FULL` com `Retry-After: 30`. Salas ficam em memória.
+- Uma sala por vez: duas salas de 100 bots disputariam os 4 núcleos da VM. Com a sala ocupada, 503 `ROOMS_FULL` com `Retry-After` e `retryAfterSeconds` pelo fim estimado da sala em andamento (abertura, tempo de liberar todos os bots e 15 s). Salas ficam em memória.
 - O token do `simulator` é renovado por uma chamada de cada vez (`SingleFlightAuthorizedClientManager`).
 
 ## Alternativas

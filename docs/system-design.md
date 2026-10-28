@@ -27,7 +27,7 @@ Regras da demonstração:
 
 - Um aviso discreto e permanente informa que é uma simulação e que nada é cobrado. Como o formulário se preenche sozinho, ninguém digita dado pessoal ou cartão real.
 - O raio-x mostra eventos emitidos de fato pelos serviços. Há dois modos alternáveis: narrado (eventos exibidos com atraso e legenda) e bruto (tempo real). O modo inicial é o narrado.
-- Cada visitante tem uma sala privada. Quando a máquina atinge o limite de salas simultâneas, o visitante seguinte espera numa fila de entrada da própria demo.
+- Cada visitante tem uma sala privada, e roda uma sala por vez. Quem chega com a sala ocupada recebe o tempo estimado até ela terminar e o site tenta de novo sozinho.
 - No celular, o site ocupa a tela e o raio-x fica numa gaveta inferior com posição na fila, estoque, bots ativos e o último evento. Arrastar a gaveta para cima abre o raio-x completo.
 
 Controles do raio-x:
@@ -169,7 +169,7 @@ sequenceDiagram
 
 ## Raio-x
 
-Cada serviço publica eventos de telemetria marcados com o identificador da sala e da requisição. O `xray` consome esses eventos, filtra por sala e envia ao navegador por Server-Sent Events. No modo narrado, o navegador segura os eventos num buffer e os exibe com atraso e legenda; no modo bruto, exibe à medida que chegam.
+`queue`, `ticketing` e `gateway` publicam eventos de telemetria no tópico `telemetry-events`, com a venda como chave (contrato em `docs/eventos.md`). O `xray` guarda os últimos eventos de cada venda e os envia ao navegador por Server-Sent Events em `/api/xray/{saleId}/events`: primeiro o histórico, depois ao vivo. No modo narrado, o navegador segura os eventos num buffer e os exibe com atraso e legenda; no modo bruto, exibe à medida que chegam. Ver ADR 0010.
 
 ## Infraestrutura
 
