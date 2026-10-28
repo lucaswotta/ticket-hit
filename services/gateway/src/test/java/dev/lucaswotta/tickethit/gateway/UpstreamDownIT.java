@@ -12,7 +12,8 @@ import org.springframework.test.web.reactive.server.WebTestClient;
         properties = {
             "QUEUE_URI=http://127.0.0.1:1",
             "TICKETING_URI=http://127.0.0.1:1",
-            "SIMULATOR_URI=http://127.0.0.1:1"
+            "SIMULATOR_URI=http://127.0.0.1:1",
+            "XRAY_URI=http://127.0.0.1:1"
         })
 @AutoConfigureWebTestClient
 @Import(TestRedis.class)

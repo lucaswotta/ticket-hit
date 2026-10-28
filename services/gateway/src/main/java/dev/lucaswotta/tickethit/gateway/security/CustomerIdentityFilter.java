@@ -1,5 +1,7 @@
 package dev.lucaswotta.tickethit.gateway.security;
 
+import dev.lucaswotta.tickethit.gateway.telemetry.Telemetry;
+import java.util.Map;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
@@ -26,10 +28,12 @@ class CustomerIdentityFilter implements GlobalFilter, Ordered {
 
     private final CustomerResolver customers;
     private final ProblemResponses problems;
+    private final Telemetry telemetry;
 
-    CustomerIdentityFilter(CustomerResolver customers, ProblemResponses problems) {
+    CustomerIdentityFilter(CustomerResolver customers, ProblemResponses problems, Telemetry telemetry) {
         this.customers = customers;
         this.problems = problems;
+        this.telemetry = telemetry;
     }
 
     @Override
@@ -38,8 +42,11 @@ class CustomerIdentityFilter implements GlobalFilter, Ordered {
                 .map(customer -> withCustomer(exchange, customer))
                 .defaultIfEmpty(withCustomer(exchange, null))
                 .flatMap(chain::filter)
-                .onErrorResume(ActAsForbiddenException.class, forbidden -> problems.write(
-                        exchange, HttpStatus.FORBIDDEN, "ACT_AS_FORBIDDEN", forbidden.getMessage()));
+                .onErrorResume(ActAsForbiddenException.class, forbidden -> {
+                    SalePaths.saleId(exchange).ifPresent(saleId -> telemetry.publish(saleId, "ACT_AS_FORBIDDEN",
+                            exchange.getRequest().getHeaders().getFirst(CustomerResolver.ACT_AS), Map.of()));
+                    return problems.write(exchange, HttpStatus.FORBIDDEN, "ACT_AS_FORBIDDEN", forbidden.getMessage());
+                });
     }
 
     // Logo depois do UpstreamUnavailableFilter e antes do rate limiter e do
