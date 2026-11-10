@@ -84,7 +84,7 @@ services:
     restart: "no"
 
   keycloak:
-    image: quay.io/keycloak/keycloak:26.8.1
+    image: quay.io/keycloak/keycloak:26.8.2-1
     # O realm é importado só se ainda não existir; mudanças depois disso vão
     # pelo console ou pelo kcadm.
     command: start-dev --import-realm
