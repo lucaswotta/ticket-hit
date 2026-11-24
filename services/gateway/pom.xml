@@ -14,7 +14,7 @@
 
     <properties>
         <!-- Release train compatível com o Spring Boot 4.1, conforme o Spring Initializr. -->
-        <spring-cloud.version>2025.1.4</spring-cloud.version>
+        <spring-cloud.version>2026.0.0</spring-cloud.version>
     </properties>
 
     <dependencyManagement>
